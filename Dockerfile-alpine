@@ -1,0 +1,29 @@
+FROM alpine:3.20
+
+RUN apk --no-cache add apache2 apache2-ssl php83-apache2 php83-ldap php83-gd curl openssl bash && \
+    sed -i '/LoadModule rewrite_module/s/^#//g' /etc/apache2/httpd.conf && \
+    sed -i 's/^Listen \(.*\)$/#\1/g' /etc/apache2/httpd.conf && \
+    echo PidFile /run/httpd.pid >>/etc/apache2/httpd.conf && \
+    rm -f /etc/apache2/conf.d/ssl.conf && \
+    ln -sfT /dev/stdout /var/log/apache2/access.log && \
+    ln -sfT /dev/stderr /var/log/apache2/error.log && \
+    ln -sfT /dev/stdout /var/log/apache2/ssl_access.log && \
+    ln -sfT /dev/stderr /var/log/apache2/ssl_error.log && \
+    ln -sfT /dev/stdout /var/log/apache2/ssl_request.log && \
+    sed -i 's|^error_reporting = .*$|error_reporting = E_ALL \& ~E_NOTICE|g' /etc/php83/php.ini
+
+ARG PHPMAILER_VERSION=6.9.1
+
+RUN mkdir /opt/PHPMailer && \
+    curl -sSL https://github.com/PHPMailer/PHPMailer/archive/refs/tags/v${PHPMAILER_VERSION}.tar.gz | tar -xzf - --directory /opt/PHPMailer --strip-components=1
+COPY www/ /opt/ldap_user_manager
+
+COPY entrypoint-alpine /usr/local/bin/entrypoint
+RUN chmod a+x /usr/local/bin/entrypoint
+
+RUN ln -sfT /var/tmp/lum.conf /etc/apache2/conf.d/lum.conf && \
+    ln -sfT /var/tmp/ports.conf /etc/apache2/conf.d/ports.conf && \
+    ln -sfT /var/tmp/ldap.conf /etc/openldap/ldap.conf
+
+CMD ["httpd", "-DFOREGROUND"]
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
