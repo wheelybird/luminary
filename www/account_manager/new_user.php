@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
 include_once "module_functions.inc.php";
 
 $attribute_map = $LDAP['default_attribute_map'];
@@ -185,6 +186,40 @@ if (isset($_POST['create_account'])) {
   $new_account = ldap_new_account($ldap_connection, $new_account_r);
 
   if ($new_account) {
+
+    // Check if MFA is enabled and if user will be in an MFA-required group
+    if ($MFA_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
+      // Get the groups this user will be added to
+      $user_groups = array();
+      if (isset($DEFAULT_USER_GROUP)) {
+        $user_groups[] = $DEFAULT_USER_GROUP;
+      }
+
+      // Check if any of the user's groups require MFA
+      $requires_mfa = false;
+      foreach ($user_groups as $group) {
+        if (in_array($group, $MFA_REQUIRED_GROUPS)) {
+          $requires_mfa = true;
+          break;
+        }
+      }
+
+      // If MFA is required, set status to pending
+      if ($requires_mfa) {
+        $user_dn = "{$LDAP['account_attribute']}={$account_identifier},{$LDAP['user_dn']}";
+
+        // Add totpUser objectClass if not present
+        $oc_mod = array('objectClass' => 'totpUser');
+        @ldap_mod_add($ldap_connection, $user_dn, $oc_mod);
+
+        // Set initial MFA status to pending with enrolled date
+        $mfa_attributes = array(
+          'totpStatus' => 'pending',
+          'totpEnrolledDate' => gmdate('YmdHis') . 'Z'
+        );
+        ldap_mod_replace($ldap_connection, $user_dn, $mfa_attributes);
+      }
+    }
 
     $creation_message = "The account was created.";
 

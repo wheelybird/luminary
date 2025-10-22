@@ -10,6 +10,7 @@ It's designed to work with OpenLDAP and to be run as a container.  It complement
  * Setup wizard: this will create the necessary structure to allow you to add users and groups and will set up an initial admin user that can log into the user manager.
  * Group creation and management.
  * User account creation and management.
+ * **Multi-factor authentication (MFA)**: Self-service TOTP enrollment and management with QR code generation.
  * Optionally send an email to the user with their new or updated account credentials.
  * Secure password auto-generator: click the button to generate a secure password.
  * Password strength indicator.
@@ -256,6 +257,54 @@ The setup utility will create the user and account trees, records that store the
 > The setup wizard is primarily designed to use with a new, empty LDAP directory, though it is possible to use it with existing directories as long as you ensure you use the correct advanced LDAP settings.
 
 Once you've set up the initial administrator account you can log into the user manager with it and start creating other accounts.  Your username to log in with is (by default) whatever you set **System username** to.  See [Account names](#account-names) below if you changed the default by setting `LDAP_ACCOUNT_ATTRIBUTE`.
+
+***
+
+## Multi-Factor Authentication (MFA)
+
+The LDAP User Manager includes self-service TOTP (Time-based One-Time Password) enrollment, allowing users to set up two-factor authentication with apps like Google Authenticator, Authy, or Microsoft Authenticator.
+
+### Requirements
+
+To use MFA, you must first install the LDAP TOTP schema in your LDAP directory:
+
+**LDAP TOTP Schema:** https://github.com/wheelybird/ldap-totp-schema
+
+This schema adds the necessary attributes (`totpSecret`, `totpStatus`, `totpScratchCode`, etc.) and object classes (`totpUser`, `mfaGroup`) to your LDAP directory for storing TOTP secrets and managing MFA policies.
+
+### Features
+
+- **Self-service enrollment**: Users can set up MFA themselves through the web interface
+- **QR code generation**: Display QR codes for easy setup with authenticator apps
+- **Backup codes**: Generate and display recovery codes for account recovery
+- **Group-based policies**: Enforce MFA requirements at the group level
+- **Grace periods**: Allow users time to set up MFA after account creation
+- **Status tracking**: Monitor MFA enrollment status for all users
+
+### Usage
+
+Once the LDAP schema is installed:
+
+1. **Users** can access the "Manage MFA" page to:
+   - Set up TOTP with QR code scanning
+   - View and save backup codes
+   - Enable/disable their MFA
+   - Check their enrollment status
+
+2. **Administrators** can:
+   - Create groups with MFA requirements
+   - Set grace periods for MFA enrollment
+   - View user MFA status in user details
+   - Manage MFA policies across the organization
+
+### Integration with Authentication Systems
+
+TOTP secrets stored in LDAP can be used by various authentication systems:
+- **OpenVPN**: Use with [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp)
+- **PAM modules**: Authenticate SSH, sudo, and other PAM-enabled services
+- **Custom applications**: Any system that can read from LDAP and validate TOTP codes
+
+See the [LDAP TOTP schema documentation](https://github.com/wheelybird/ldap-totp-schema) for full implementation details and integration examples.
 
 ***
 

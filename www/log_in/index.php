@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include "web_functions.inc.php";
 include "ldap_functions.inc.php";
+include "totp_functions.inc.php";
 
 if (isset($_GET["unauthorised"])) { $display_unauth = TRUE; }
 if (isset($_GET["session_timeout"])) { $display_logged_out = TRUE; }
@@ -25,20 +26,67 @@ if (isset($_POST["user_id"]) and isset($_POST["password"])) {
  $account_id = ldap_auth_username($ldap_connection,$_POST["user_id"],$_POST["password"]);
  $is_admin = ldap_is_group_member($ldap_connection,$LDAP['admins_group'],$account_id);
 
- ldap_close($ldap_connection);
-
  if ($account_id != FALSE) {
 
+  // Check MFA status if MFA is enabled
+  $mfa_redirect_needed = false;
+  if ($MFA_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
+
+   // Get user's MFA status
+   $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+     "({$LDAP['account_attribute']}=" . ldap_escape($account_id, "", LDAP_ESCAPE_FILTER) . ")",
+     array('totpStatus', 'totpEnrolledDate', 'memberOf'));
+
+   if ($user_search) {
+    $user_entry = ldap_get_entries($ldap_connection, $user_search);
+    if ($user_entry['count'] > 0) {
+     $totp_status = isset($user_entry[0]['totpstatus'][0]) ? $user_entry[0]['totpstatus'][0] : 'none';
+     $totp_enrolled_date = isset($user_entry[0]['totpenrolleddate'][0]) ? $user_entry[0]['totpenrolleddate'][0] : null;
+
+     // Check if user is in MFA-required group
+     $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $account_id, $MFA_REQUIRED_GROUPS);
+
+     if ($user_requires_mfa) {
+      // If MFA is not active, check grace period
+      if ($totp_status !== 'active') {
+
+       if ($totp_status == 'pending' && $totp_enrolled_date) {
+        // User has pending status - check if grace period has expired
+        $grace_period_remaining = totp_grace_period_remaining($totp_enrolled_date, $MFA_GRACE_PERIOD_DAYS);
+
+        // Only redirect if grace period has actually expired
+        if ($grace_period_remaining <= 0) {
+         $mfa_redirect_needed = true;
+        }
+       }
+       elseif ($totp_status == 'none' || $totp_status == 'disabled') {
+        // User has no MFA configured and no grace period - redirect immediately
+        $mfa_redirect_needed = true;
+       }
+      }
+     }
+    }
+   }
+  }
+
+  ldap_close($ldap_connection);
+
   set_passkey_cookie($account_id,$is_admin);
-  if (isset($_POST["redirect_to"])) {
+
+  // If MFA setup is required, redirect to Manage MFA page
+  if ($mfa_redirect_needed) {
+   header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}manage_mfa?mfa_required\n\n");
+  }
+  elseif (isset($_POST["redirect_to"])) {
    header("Location: //{$_SERVER['HTTP_HOST']}" . base64_decode($_POST['redirect_to']) . "\n\n");
   }
   else {
-   if ($IS_ADMIN) { $default_module = "account_manager"; } else { $default_module = "change_password"; }
+   $default_module = "home";
    header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}$default_module?logged_in\n\n");
   }
  }
  else {
+  ldap_close($ldap_connection);
   header("Location: //{$_SERVER['HTTP_HOST']}{$THIS_MODULE_PATH}/index.php?invalid\n\n");
  }
 

@@ -159,6 +159,13 @@
  $ACCOUNT_REQUESTS_EMAIL = (getenv('ACCOUNT_REQUESTS_EMAIL') ? getenv('ACCOUNT_REQUESTS_EMAIL') : $EMAIL['from_address']);
 
 
+ # MFA/TOTP Configuration
+
+ $MFA_ENABLED = ((strcasecmp(getenv('MFA_ENABLED'),'TRUE') == 0) ? TRUE : FALSE);
+ $MFA_REQUIRED_GROUPS = (getenv('MFA_REQUIRED_GROUPS') ? explode(',', getenv('MFA_REQUIRED_GROUPS')) : array());
+ $MFA_GRACE_PERIOD_DAYS = (getenv('MFA_GRACE_PERIOD_DAYS') ? intval(getenv('MFA_GRACE_PERIOD_DAYS')) : 7);
+ $MFA_TOTP_ISSUER = (getenv('MFA_TOTP_ISSUER') ? getenv('MFA_TOTP_ISSUER') : $ORGANISATION_NAME);
+
  # Debugging
 
  $LDAP_DEBUG = ((strcasecmp(getenv('LDAP_DEBUG'),'TRUE') == 0) ? TRUE : FALSE);

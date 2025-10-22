@@ -189,10 +189,15 @@ function validate_setup_cookie() {
  if (isset($_COOKIE['setup_cookie'])) {
 
   $c_passkey = $_COOKIE['setup_cookie'];
-  $session_file = file_get_contents("/tmp/ldap_setup");
+  if (file_exists("/tmp/ldap_setup")) {
+   $session_file = file_get_contents("/tmp/ldap_setup");
+  } else {
+   $session_file = FALSE;
+  }
   if (!$session_file) {
    $IS_SETUP_ADMIN = FALSE;
    if ( $SESSION_DEBUG == TRUE) {  error_log("$log_prefix Setup session: setup_cookie was sent by the client but the session file wasn't found at /tmp/ldap_setup",0); }
+   return;
   }
   list($f_passkey,$f_time) = explode(":",$session_file);
   $this_time=time();
@@ -309,7 +314,13 @@ function render_menu() {
      <?php
      foreach ($MODULES as $module => $access) {
 
-      $this_module_name=stripslashes(ucwords(preg_replace('/_/',' ',$module)));
+      // Use custom display name if defined, otherwise convert directory name
+      global $MODULE_NAMES;
+      if (isset($MODULE_NAMES[$module])) {
+        $this_module_name = $MODULE_NAMES[$module];
+      } else {
+        $this_module_name = stripslashes(ucwords(preg_replace('/_/',' ',$module)));
+      }
 
       $show_this_module = TRUE;
       if ($VALIDATED == TRUE) {

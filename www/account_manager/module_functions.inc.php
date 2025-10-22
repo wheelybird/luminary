@@ -6,11 +6,15 @@
 
 function render_submenu() {
 
-  global $THIS_MODULE_PATH;
+  global $THIS_MODULE_PATH, $MFA_ENABLED;
 
   $submodules = array( 'users' => 'index.php',
                        'groups' => 'groups.php'
                      );
+
+  if ($MFA_ENABLED == TRUE) {
+    $submodules['mfa status'] = 'mfa_status.php';
+  }
   ?>
    <nav class="navbar navbar-default">
     <div class="container-fluid">

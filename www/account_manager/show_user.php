@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
 include_once "module_functions.inc.php";
 set_page_access("admin");
 
@@ -44,6 +45,30 @@ $ldap_connection = open_ldap_connection();
 $ldap_search_query="({$LDAP['account_attribute']}=". ldap_escape($account_identifier, "", LDAP_ESCAPE_FILTER) . ")";
 $ldap_search = ldap_search( $ldap_connection, $LDAP['user_dn'], $ldap_search_query);
 
+// Handle backup code regeneration (admin only)
+if (isset($_POST['regenerate_backup_codes'])) {
+  $regenerate_search = ldap_search($ldap_connection, $LDAP['user_dn'], $ldap_search_query);
+  if ($regenerate_search) {
+    $regenerate_user = ldap_get_entries($ldap_connection, $regenerate_search);
+    if ($regenerate_user['count'] > 0) {
+      $regenerate_dn = $regenerate_user[0]['dn'];
+
+      // Generate new backup codes
+      $new_backup_codes = totp_generate_backup_codes(10, 8);
+
+      // Update LDAP with new codes
+      $modifications = array(
+        'totpScratchCode' => $new_backup_codes
+      );
+
+      if (ldap_mod_replace($ldap_connection, $regenerate_dn, $modifications)) {
+        render_alert_banner("New backup codes have been generated. The user should be notified to collect them from their Manage MFA page.");
+      } else {
+        render_alert_banner("Failed to regenerate backup codes. Check the logs for more information.", "danger", 15000);
+      }
+    }
+  }
+}
 
 #########################
 
@@ -510,6 +535,77 @@ if ($ldap_search) {
 
  </div>
 </div>
+
+<?php if ($MFA_ENABLED == TRUE) {
+  // Get MFA status for this user
+  $user_totp_status = isset($user[0]['totpstatus'][0]) ? $user[0]['totpstatus'][0] : 'none';
+  $user_backup_code_count = totp_get_backup_code_count($ldap_connection, $dn);
+  $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
+?>
+<div class="container">
+ <div class="col-sm-8 col-md-offset-2">
+  <div class="panel panel-default">
+   <div class="panel-heading clearfix">
+    <h3 class="panel-title pull-left" style="padding-top: 7.5px;">Multi-Factor Authentication</h3>
+   </div>
+   <div class="panel-body">
+    <table class="table table-condensed">
+      <tr>
+        <th width="30%">MFA Status:</th>
+        <td>
+          <?php
+            switch ($user_totp_status) {
+              case 'active':
+                echo '<span class="label label-success">Active</span>';
+                break;
+              case 'pending':
+                echo '<span class="label label-warning">Pending Setup</span>';
+                break;
+              case 'disabled':
+                echo '<span class="label label-default">Disabled</span>';
+                break;
+              default:
+                echo '<span class="label label-default">Not Configured</span>';
+            }
+          ?>
+        </td>
+      </tr>
+      <?php if ($user_requires_mfa) { ?>
+      <tr>
+        <th>MFA Required:</th>
+        <td><span class="label label-info">Yes</span> (Required by group membership)</td>
+      </tr>
+      <?php } ?>
+      <?php if ($user_totp_status == 'active' && $user_backup_code_count > 0) { ?>
+      <tr>
+        <th>Backup Codes:</th>
+        <td>
+          <span class="label <?php echo $user_backup_code_count < 3 ? 'label-warning' : 'label-info'; ?>">
+            <?php echo $user_backup_code_count; ?> remaining
+          </span>
+          <?php if ($user_backup_code_count < 3) { ?>
+            <span class="text-warning"><small> - Running low</small></span>
+          <?php } ?>
+        </td>
+      </tr>
+      <?php } ?>
+    </table>
+
+    <?php if ($user_totp_status == 'active') { ?>
+    <form method="post" style="margin-top: 15px;">
+      <input type="hidden" name="account_identifier" value="<?php echo htmlspecialchars($account_identifier); ?>">
+      <input type="hidden" name="regenerate_backup_codes" value="1">
+      <button type="submit" class="btn btn-warning" onclick="return confirm('This will generate new backup codes and invalidate any existing unused codes. Continue?');">
+        Regenerate Backup Codes
+      </button>
+    </form>
+    <?php } ?>
+
+   </div>
+  </div>
+ </div>
+</div>
+<?php } ?>
 
 <div class="container">
  <div class="col-sm-12">

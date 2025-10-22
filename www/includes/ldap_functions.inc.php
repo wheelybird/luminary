@@ -475,8 +475,18 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
 
  $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
+ // Ensure group_membership_attribute is set
+ if (!isset($LDAP['group_membership_attribute'])) {
+  $LDAP['group_membership_attribute'] = 'memberuid';
+ }
+
  $ldap_search_query = "({$LDAP['group_attribute']}=". ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
  $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query, array($LDAP['group_membership_attribute']));
+
+ if ($ldap_search === false) {
+  if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix LDAP search failed for group {$group_name}: " . ldap_error($ldap_connection), 0); }
+  return array();
+ }
 
  $result = @ ldap_get_entries($ldap_connection, $ldap_search);
  if ($result) { $result_count = $result['count']; } else { $result_count = 0; }
@@ -485,14 +495,17 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
 
  if ($result_count > 0) {
 
-  foreach ($result[0][$LDAP['group_membership_attribute']] as $key => $value) {
+  // Check if the membership attribute exists in the result
+  if (isset($result[0][$LDAP['group_membership_attribute']]) && is_array($result[0][$LDAP['group_membership_attribute']])) {
+   foreach ($result[0][$LDAP['group_membership_attribute']] as $key => $value) {
 
-   if ($key !== 'count' and !empty($value)) {
-    $this_member = preg_replace("/^.*?=(.*?),.*/", "$1", $value);
-    array_push($records, $this_member);
-    if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix {$value} is a member",0); }
+    if ($key !== 'count' and !empty($value)) {
+     $this_member = preg_replace("/^.*?=(.*?),.*/", "$1", $value);
+     array_push($records, $this_member);
+     if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix {$value} is a member",0); }
+    }
+
    }
-
   }
 
   $actual_result_count = count($records);
@@ -813,7 +826,7 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
 
 function ldap_new_account($ldap_connection,$account_r) {
 
-  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP;
+  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP, $MFA_ENABLED, $MFA_REQUIRED_GROUPS;
 
   if (    isset($account_r['givenname'][0])
       and isset($account_r['sn'][0])
@@ -886,6 +899,29 @@ function ldap_new_account($ldap_connection,$account_r) {
            error_log("$log_prefix Unable to update cn=lastUID to $new_uid - this could cause user accounts to share the same UID.",0);
          }
        }
+
+       // Initialise MFA if enabled and user is in required group
+       if ($MFA_ENABLED && !empty($MFA_REQUIRED_GROUPS)) {
+         include_once "totp_functions.inc.php";
+         $user_dn = "{$LDAP['account_attribute']}=$account_identifier,{$LDAP['user_dn']}";
+
+         if (totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS)) {
+           // Add totpUser object class and set status to pending
+           $mfa_modifications = array(
+             'objectClass' => array_merge($objectclasses, array('totpUser')),
+             'totpStatus' => 'pending',
+             'totpEnrolledDate' => gmdate('YmdHis') . 'Z',
+           );
+
+           $add_mfa = @ ldap_mod_replace($ldap_connection, $user_dn, $mfa_modifications);
+           if ($add_mfa) {
+             error_log("$log_prefix Create account; Initialised MFA (pending) for $account_identifier",0);
+           } else {
+             error_log("$log_prefix Create account; Failed to initialise MFA for $account_identifier: " . ldap_error($ldap_connection),0);
+           }
+         }
+       }
+
        return TRUE;
      }
      else {

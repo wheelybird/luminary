@@ -9,9 +9,25 @@
 
  $MODULES = array(
                     'log_in'          => 'hidden_on_login',
+                    'home'            => 'auth',
                     'change_password' => 'auth',
                     'account_manager' => 'admin',
                   );
+
+ #Module display names (optional - if not set, directory name is used)
+ $MODULE_NAMES = array(
+                    'log_in'          => 'Log In',
+                    'home'            => 'Home',
+                    'change_password' => 'Change Password',
+                    'account_manager' => 'Account Manager',
+                    'log_out'         => 'Log Out',
+                    'request_account' => 'Request Account',
+                    'manage_mfa'      => 'Manage MFA',
+                  );
+
+if ($MFA_ENABLED == TRUE) {
+  $MODULES['manage_mfa'] = 'auth';
+}
 
 if ($ACCOUNT_REQUESTS_ENABLED == TRUE) {
   $MODULES['request_account'] = 'hidden_on_login';
