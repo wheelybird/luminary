@@ -28,20 +28,25 @@ if (isset($_POST["user_id"]) and isset($_POST["password"])) {
 
  if ($account_id != FALSE) {
 
-  // Check MFA status if MFA is enabled
+  // Check MFA status if MFA is fully operational
   $mfa_redirect_needed = false;
-  if ($MFA_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
+  if ($MFA_FULLY_OPERATIONAL == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
 
    // Get user's MFA status
+   $status_attr = $TOTP_ATTRS['status'];
+   $enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+   $status_attr_lower = strtolower($status_attr);
+   $enrolled_attr_lower = strtolower($enrolled_attr);
+
    $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
      "({$LDAP['account_attribute']}=" . ldap_escape($account_id, "", LDAP_ESCAPE_FILTER) . ")",
-     array('totpStatus', 'totpEnrolledDate', 'memberOf'));
+     array($status_attr, $enrolled_attr, 'memberOf'));
 
    if ($user_search) {
     $user_entry = ldap_get_entries($ldap_connection, $user_search);
     if ($user_entry['count'] > 0) {
-     $totp_status = isset($user_entry[0]['totpstatus'][0]) ? $user_entry[0]['totpstatus'][0] : 'none';
-     $totp_enrolled_date = isset($user_entry[0]['totpenrolleddate'][0]) ? $user_entry[0]['totpenrolleddate'][0] : null;
+     $totp_status = isset($user_entry[0][$status_attr_lower][0]) ? $user_entry[0][$status_attr_lower][0] : 'none';
+     $totp_enrolled_date = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_entry[0][$enrolled_attr_lower][0] : null;
 
      // Check if user is in MFA-required group
      $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $account_id, $MFA_REQUIRED_GROUPS);

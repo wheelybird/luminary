@@ -205,7 +205,10 @@ function totp_format_backup_codes($codes) {
  * @return string|null TOTP status or null if not set
  */
 function totp_get_status($ldap_connection, $user_dn) {
-  $attributes = array('totpStatus');
+  global $TOTP_ATTRS;
+
+  $status_attr = $TOTP_ATTRS['status'];
+  $attributes = array($status_attr);
   $search = ldap_read($ldap_connection, $user_dn, '(objectClass=*)', $attributes);
 
   if (!$search) {
@@ -213,9 +216,10 @@ function totp_get_status($ldap_connection, $user_dn) {
   }
 
   $entry = ldap_get_entries($ldap_connection, $search);
+  $status_attr_lower = strtolower($status_attr);
 
-  if ($entry['count'] > 0 && isset($entry[0]['totpstatus'][0])) {
-    return $entry[0]['totpstatus'][0];
+  if ($entry['count'] > 0 && isset($entry[0][$status_attr_lower][0])) {
+    return $entry[0][$status_attr_lower][0];
   }
 
   return null;
@@ -229,7 +233,10 @@ function totp_get_status($ldap_connection, $user_dn) {
  * @return int Number of backup codes remaining
  */
 function totp_get_backup_code_count($ldap_connection, $user_dn) {
-  $attributes = array('totpScratchCode');
+  global $TOTP_ATTRS;
+
+  $scratch_attr = $TOTP_ATTRS['scratch_codes'];
+  $attributes = array($scratch_attr);
   $search = ldap_read($ldap_connection, $user_dn, '(objectClass=*)', $attributes);
 
   if (!$search) {
@@ -237,9 +244,10 @@ function totp_get_backup_code_count($ldap_connection, $user_dn) {
   }
 
   $entry = ldap_get_entries($ldap_connection, $search);
+  $scratch_attr_lower = strtolower($scratch_attr);
 
-  if ($entry['count'] > 0 && isset($entry[0]['totpscratchcode']['count'])) {
-    return (int)$entry[0]['totpscratchcode']['count'];
+  if ($entry['count'] > 0 && isset($entry[0][$scratch_attr_lower]['count'])) {
+    return (int)$entry[0][$scratch_attr_lower]['count'];
   }
 
   return 0;
@@ -255,9 +263,17 @@ function totp_get_backup_code_count($ldap_connection, $user_dn) {
  * @return bool True on success, false on failure
  */
 function totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes = array()) {
-  global $LDAP;
+  global $LDAP, $TOTP_ATTRS, $MFA_SCHEMA_OK;
 
-  // Add totpUser object class if not present
+  // Check if schema is available
+  if (!$MFA_SCHEMA_OK) {
+    error_log("totp_set_secret: Cannot set TOTP secret - schema not available");
+    return false;
+  }
+
+  $objectclass = $TOTP_ATTRS['objectclass'];
+
+  // Add TOTP object class if not present
   $search = ldap_read($ldap_connection, $user_dn, '(objectClass=*)', array('objectClass'));
   if ($search) {
     $entry = ldap_get_entries($ldap_connection, $search);
@@ -267,8 +283,8 @@ function totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes = ar
       $object_classes[] = $entry[0]['objectclass'][$i];
     }
 
-    if (!in_array('totpUser', array_map('strtolower', $object_classes))) {
-      $oc_mod = array('objectClass' => 'totpUser');
+    if (!in_array($objectclass, array_map('strtolower', $object_classes))) {
+      $oc_mod = array('objectClass' => $objectclass);
       if (!@ldap_mod_add($ldap_connection, $user_dn, $oc_mod)) {
         // If add fails, object class might already exist - continue anyway
       }
@@ -277,13 +293,13 @@ function totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes = ar
 
   // Set TOTP attributes
   $modifications = array();
-  $modifications['totpSecret'] = $secret;
-  $modifications['totpEnrolledDate'] = gmdate('YmdHis') . 'Z';
-  $modifications['totpStatus'] = 'active';
+  $modifications[$TOTP_ATTRS['secret']] = $secret;
+  $modifications[$TOTP_ATTRS['enrolled_date']] = gmdate('YmdHis') . 'Z';
+  $modifications[$TOTP_ATTRS['status']] = 'active';
 
   // Set backup codes if provided
   if (count($backup_codes) > 0) {
-    $modifications['totpScratchCode'] = $backup_codes;
+    $modifications[$TOTP_ATTRS['scratch_codes']] = $backup_codes;
   }
 
   return ldap_mod_replace($ldap_connection, $user_dn, $modifications);
@@ -297,10 +313,18 @@ function totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes = ar
  * @return bool True on success, false on failure
  */
 function totp_disable($ldap_connection, $user_dn) {
+  global $TOTP_ATTRS, $MFA_SCHEMA_OK;
+
+  // Check if schema is available
+  if (!$MFA_SCHEMA_OK) {
+    error_log("totp_disable: Cannot disable TOTP - schema not available");
+    return false;
+  }
+
   $modifications = array(
-    'totpSecret' => array(),
-    'totpScratchCode' => array(),
-    'totpStatus' => 'disabled',
+    $TOTP_ATTRS['secret'] => array(),
+    $TOTP_ATTRS['scratch_codes'] => array(),
+    $TOTP_ATTRS['status'] => 'disabled',
   );
 
   return ldap_mod_replace($ldap_connection, $user_dn, $modifications);
@@ -373,7 +397,12 @@ function totp_grace_period_remaining($enrolled_date, $grace_period_days) {
  * @return array Status array with keys: requires_mfa, status, enrolled_date, days_remaining, needs_setup
  */
 function totp_get_user_mfa_status($ldap_connection, $username, $mfa_required_groups = array(), $grace_period_days = 7) {
-  global $LDAP;
+  global $LDAP, $TOTP_ATTRS;
+
+  $status_attr = $TOTP_ATTRS['status'];
+  $enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+  $status_attr_lower = strtolower($status_attr);
+  $enrolled_attr_lower = strtolower($enrolled_attr);
 
   $status_data = array(
     'requires_mfa' => false,
@@ -390,13 +419,13 @@ function totp_get_user_mfa_status($ldap_connection, $username, $mfa_required_gro
 
   // Get user's current MFA attributes
   $user_filter = "({$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ")";
-  $user_search = ldap_search($ldap_connection, $LDAP['user_dn'], $user_filter, array('totpStatus', 'totpEnrolledDate'));
+  $user_search = ldap_search($ldap_connection, $LDAP['user_dn'], $user_filter, array($status_attr, $enrolled_attr));
 
   if ($user_search) {
     $user_entry = ldap_get_entries($ldap_connection, $user_search);
     if ($user_entry['count'] > 0) {
-      $status_data['status'] = isset($user_entry[0]['totpstatus'][0]) ? $user_entry[0]['totpstatus'][0] : 'none';
-      $status_data['enrolled_date'] = isset($user_entry[0]['totpenrolleddate'][0]) ? $user_entry[0]['totpenrolleddate'][0] : null;
+      $status_data['status'] = isset($user_entry[0][$status_attr_lower][0]) ? $user_entry[0][$status_attr_lower][0] : 'none';
+      $status_data['enrolled_date'] = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_entry[0][$enrolled_attr_lower][0] : null;
 
       if ($status_data['enrolled_date']) {
         $status_data['days_remaining'] = totp_grace_period_remaining($status_data['enrolled_date'], $grace_period_days);

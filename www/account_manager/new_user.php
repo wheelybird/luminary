@@ -204,20 +204,23 @@ if (isset($_POST['create_account'])) {
         }
       }
 
-      // If MFA is required, set status to pending
-      if ($requires_mfa) {
+      // If MFA is required and schema is available, set status to pending
+      if ($requires_mfa && $MFA_SCHEMA_OK) {
         $user_dn = "{$LDAP['account_attribute']}={$account_identifier},{$LDAP['user_dn']}";
 
-        // Add totpUser objectClass if not present
-        $oc_mod = array('objectClass' => 'totpUser');
+        // Add TOTP objectClass if not present
+        $oc_mod = array('objectClass' => $TOTP_ATTRS['objectclass']);
         @ldap_mod_add($ldap_connection, $user_dn, $oc_mod);
 
         // Set initial MFA status to pending with enrolled date
         $mfa_attributes = array(
-          'totpStatus' => 'pending',
-          'totpEnrolledDate' => gmdate('YmdHis') . 'Z'
+          $TOTP_ATTRS['status'] => 'pending',
+          $TOTP_ATTRS['enrolled_date'] => gmdate('YmdHis') . 'Z'
         );
         ldap_mod_replace($ldap_connection, $user_dn, $mfa_attributes);
+      }
+      elseif ($requires_mfa && !$MFA_SCHEMA_OK) {
+        error_log("Cannot set MFA pending status for new user {$account_identifier}: TOTP schema not available");
       }
     }
 

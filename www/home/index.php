@@ -11,7 +11,7 @@ set_page_access("user");
 $ldap_connection = open_ldap_connection();
 $mfa_status = array('needs_setup' => false);
 
-if ($MFA_ENABLED && !empty($MFA_REQUIRED_GROUPS)) {
+if ($MFA_FULLY_OPERATIONAL && !empty($MFA_REQUIRED_GROUPS)) {
   include_once "totp_functions.inc.php";
   $mfa_status = totp_get_user_mfa_status($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS, $MFA_GRACE_PERIOD_DAYS);
 }
@@ -98,6 +98,150 @@ render_header("$ORGANISATION_NAME account manager");
     <?php } ?>
 
   </div>
+
+  <?php if ($IS_ADMIN): ?>
+  <div class="row" style="margin-top: 30px;">
+    <div class="col-md-12">
+      <div class="panel panel-info">
+        <div class="panel-heading">
+          <h3 class="panel-title">System Status</h3>
+        </div>
+        <div class="panel-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h4>LDAP Configuration</h4>
+              <table class="table table-condensed">
+                <tr>
+                  <th style="width: 40%;">LDAP URI:</th>
+                  <td><?php echo htmlspecialchars($LDAP['uri']); ?></td>
+                </tr>
+                <tr>
+                  <th>Base DN:</th>
+                  <td><?php echo htmlspecialchars($LDAP['base_dn']); ?></td>
+                </tr>
+                <tr>
+                  <th>RFC2307bis:</th>
+                  <td>
+                    <?php
+                    $ldap_conn = open_ldap_connection();
+                    $rfc2307bis = ldap_detect_rfc2307bis($ldap_conn);
+                    ldap_close($ldap_conn);
+                    if ($rfc2307bis): ?>
+                      <span class="label label-success">Enabled</span>
+                    <?php else: ?>
+                      <span class="label label-default">Disabled</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              </table>
+
+              <h4>Email Configuration</h4>
+              <table class="table table-condensed">
+                <tr>
+                  <th style="width: 40%;">SMTP:</th>
+                  <td>
+                    <?php if ($EMAIL_SENDING_ENABLED): ?>
+                      <span class="label label-success">Configured</span>
+                      <br><small><?php echo htmlspecialchars($SMTP['host'] . ':' . $SMTP['port']); ?></small>
+                    <?php else: ?>
+                      <span class="label label-default">Not Configured</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Account Requests:</th>
+                  <td>
+                    <?php if ($ACCOUNT_REQUESTS_ENABLED): ?>
+                      <span class="label label-success">Enabled</span>
+                    <?php else: ?>
+                      <span class="label label-default">Disabled</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <div class="col-md-6">
+              <h4>Multi-Factor Authentication</h4>
+              <table class="table table-condensed">
+                <tr>
+                  <th style="width: 40%;">MFA Status:</th>
+                  <td>
+                    <?php if ($MFA_ENABLED): ?>
+                      <span class="label label-info">Enabled</span>
+                    <?php else: ?>
+                      <span class="label label-default">Disabled</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+                <?php if ($MFA_ENABLED): ?>
+                <tr>
+                  <th>TOTP Schema:</th>
+                  <td>
+                    <?php if ($MFA_SCHEMA_OK): ?>
+                      <span class="label label-success">OK</span>
+                      <br><small>Object class: <?php echo htmlspecialchars($TOTP_ATTRS['objectclass']); ?></small>
+                    <?php else: ?>
+                      <span class="label label-warning">Missing</span>
+                      <br><small class="text-warning">Schema not found in LDAP</small>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+                <?php if (!$MFA_SCHEMA_OK): ?>
+                <tr>
+                  <td colspan="2">
+                    <div class="alert alert-warning" style="margin-bottom: 0;">
+                      <strong>Warning:</strong> MFA is enabled but the TOTP schema is not installed in LDAP.
+                      <br>Users will not be able to enrol in MFA until the schema is added.
+                      <br><br>
+                      <strong>To resolve:</strong>
+                      <ol>
+                        <li>Install the TOTP schema from <a href="https://github.com/wheelybird/ldap-totp-schema" target="_blank">ldap-totp-schema repository</a></li>
+                        <li>Verify installation with:<br>
+                          <code style="display: block; margin: 5px 0; padding: 5px; background: #f5f5f5;">ldapsearch -Y EXTERNAL -H ldapi:/// -b cn=schema,cn=config "(cn=*totp*)"</code>
+                        </li>
+                        <li>Restart this container to re-check the schema</li>
+                      </ol>
+                    </div>
+                  </td>
+                </tr>
+                <?php endif; ?>
+                <?php if ($MFA_FULLY_OPERATIONAL && !empty($MFA_REQUIRED_GROUPS)): ?>
+                <tr>
+                  <th>Required Groups:</th>
+                  <td>
+                    <?php foreach ($MFA_REQUIRED_GROUPS as $group): ?>
+                      <span class="label label-info"><?php echo htmlspecialchars($group); ?></span>
+                    <?php endforeach; ?>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Grace Period:</th>
+                  <td><?php echo $MFA_GRACE_PERIOD_DAYS; ?> days</td>
+                </tr>
+                <?php endif; ?>
+                <?php endif; ?>
+              </table>
+
+              <h4>System Information</h4>
+              <table class="table table-condensed">
+                <tr>
+                  <th style="width: 40%;">PHP Version:</th>
+                  <td><?php echo PHP_VERSION; ?></td>
+                </tr>
+                <tr>
+                  <th>Session Timeout:</th>
+                  <td><?php echo $SESSION_TIMEOUT; ?> minutes</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
 </div>
 
 <?php

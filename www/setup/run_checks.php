@@ -93,6 +93,89 @@ else {
      </div>
 
      <div class="panel panel-default">
+      <div class="panel-heading">MFA/TOTP schema check</div>
+      <div class="panel-body">
+       <ul class="list-group">
+<?php
+
+// Check MFA configuration and schema availability
+if ($MFA_ENABLED == TRUE) {
+
+ $totp_objectclass = $TOTP_ATTRS['objectclass'];
+ $totp_secret_attr = $TOTP_ATTRS['secret'];
+ $totp_status_attr = $TOTP_ATTRS['status'];
+ $totp_enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+ $totp_scratch_attr = $TOTP_ATTRS['scratch_codes'];
+
+ // Check if objectClass exists in schema
+ $oc_search = @ldap_read($ldap_connection, "cn=subschema", "(objectClass=*)", array("objectClasses"));
+ $schema_found = false;
+ $missing_attrs = array();
+
+ if ($oc_search) {
+  $schema_entry = ldap_get_entries($ldap_connection, $oc_search);
+  if (isset($schema_entry[0]['objectclasses'])) {
+   foreach ($schema_entry[0]['objectclasses'] as $oc) {
+    if (stripos($oc, $totp_objectclass) !== false) {
+     $schema_found = true;
+     break;
+    }
+   }
+  }
+
+  // Check for attributes
+  if ($schema_found) {
+   $attr_search = @ldap_read($ldap_connection, "cn=subschema", "(objectClass=*)", array("attributeTypes"));
+   if ($attr_search) {
+    $attr_entry = ldap_get_entries($ldap_connection, $attr_search);
+    if (isset($attr_entry[0]['attributetypes'])) {
+     $found_attrs = array();
+     foreach ($attr_entry[0]['attributetypes'] as $attr) {
+      if (stripos($attr, "NAME '$totp_secret_attr'") !== false) $found_attrs[] = $totp_secret_attr;
+      if (stripos($attr, "NAME '$totp_status_attr'") !== false) $found_attrs[] = $totp_status_attr;
+      if (stripos($attr, "NAME '$totp_enrolled_attr'") !== false) $found_attrs[] = $totp_enrolled_attr;
+      if (stripos($attr, "NAME '$totp_scratch_attr'") !== false) $found_attrs[] = $totp_scratch_attr;
+     }
+
+     $required_attrs = array($totp_secret_attr, $totp_status_attr, $totp_enrolled_attr, $totp_scratch_attr);
+     $missing_attrs = array_diff($required_attrs, $found_attrs);
+    }
+   }
+  }
+ }
+
+ if ($schema_found && empty($missing_attrs)) {
+  print "$li_good MFA is enabled and the TOTP schema (<strong>$totp_objectclass</strong>) with all required attributes is present. ";
+  print "<a href='#' data-toggle='popover' title='MFA/TOTP Schema' data-content='";
+  print "The TOTP schema allows users to enrol in multi-factor authentication with time-based one-time passwords stored in LDAP.";
+  print "'>What's this?</a></li>\n";
+ }
+ elseif ($schema_found && !empty($missing_attrs)) {
+  print "$li_warn MFA is enabled and the object class <strong>$totp_objectclass</strong> exists, but the following attributes are missing: <strong>" . implode(', ', $missing_attrs) . "</strong>.<br>\n";
+  print "MFA will not function until all required attributes are installed. ";
+  print "<a href='#' data-toggle='popover' title='Missing TOTP Attributes' data-content='";
+  print "The TOTP object class was found but some required attributes are missing from the schema. Install the complete schema from the ldap-totp-schema repository.";
+  print "'>What's this?</a></li>\n";
+ }
+ else {
+  print "$li_warn MFA is enabled but the TOTP schema (<strong>$totp_objectclass</strong>) is not installed in LDAP.<br>\n";
+  print "MFA will not function until the schema is installed. See the <a href='https://github.com/wheelybird/ldap-totp-schema' target='_blank'>ldap-totp-schema repository</a> for installation instructions. ";
+  print "<a href='#' data-toggle='popover' title='Missing TOTP Schema' data-content='";
+  print "Multi-factor authentication requires the TOTP schema to store secrets and configuration in LDAP. Without it, users cannot enrol in MFA.";
+  print "'>What's this?</a></li>\n";
+ }
+
+}
+else {
+ print "$li_good MFA is not enabled (MFA_ENABLED is not set to TRUE).</li>\n";
+}
+
+?>
+       </ul>
+      </div>
+     </div>
+
+     <div class="panel panel-default">
       <div class="panel-heading">LDAP OU checks</div>
       <div class="panel-body">
        <ul class="list-group">

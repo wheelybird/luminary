@@ -47,24 +47,28 @@ $ldap_search = ldap_search( $ldap_connection, $LDAP['user_dn'], $ldap_search_que
 
 // Handle backup code regeneration (admin only)
 if (isset($_POST['regenerate_backup_codes'])) {
-  $regenerate_search = ldap_search($ldap_connection, $LDAP['user_dn'], $ldap_search_query);
-  if ($regenerate_search) {
-    $regenerate_user = ldap_get_entries($ldap_connection, $regenerate_search);
-    if ($regenerate_user['count'] > 0) {
-      $regenerate_dn = $regenerate_user[0]['dn'];
+  if (!$MFA_SCHEMA_OK) {
+    render_alert_banner("Cannot regenerate backup codes: TOTP schema is not installed in LDAP.", "danger", 15000);
+  } else {
+    $regenerate_search = ldap_search($ldap_connection, $LDAP['user_dn'], $ldap_search_query);
+    if ($regenerate_search) {
+      $regenerate_user = ldap_get_entries($ldap_connection, $regenerate_search);
+      if ($regenerate_user['count'] > 0) {
+        $regenerate_dn = $regenerate_user[0]['dn'];
 
-      // Generate new backup codes
-      $new_backup_codes = totp_generate_backup_codes(10, 8);
+        // Generate new backup codes
+        $new_backup_codes = totp_generate_backup_codes(10, 8);
 
-      // Update LDAP with new codes
-      $modifications = array(
-        'totpScratchCode' => $new_backup_codes
-      );
+        // Update LDAP with new codes
+        $modifications = array(
+          $TOTP_ATTRS['scratch_codes'] => $new_backup_codes
+        );
 
-      if (ldap_mod_replace($ldap_connection, $regenerate_dn, $modifications)) {
-        render_alert_banner("New backup codes have been generated. The user should be notified to collect them from their Manage MFA page.");
-      } else {
-        render_alert_banner("Failed to regenerate backup codes. Check the logs for more information.", "danger", 15000);
+        if (ldap_mod_replace($ldap_connection, $regenerate_dn, $modifications)) {
+          render_alert_banner("New backup codes have been generated. The user should be notified to collect them from their Manage MFA page.");
+        } else {
+          render_alert_banner("Failed to regenerate backup codes. Check the logs for more information.", "danger", 15000);
+        }
       }
     }
   }
@@ -592,6 +596,11 @@ if ($ldap_search) {
     </table>
 
     <?php if ($user_totp_status == 'active') { ?>
+    <?php if (!$MFA_SCHEMA_OK) { ?>
+      <div class="alert alert-warning" style="margin-top: 15px;">
+        <strong>MFA Schema Missing:</strong> Backup code regeneration is unavailable because the TOTP schema is not installed in LDAP. See the System Status panel on the home page for details.
+      </div>
+    <?php } else { ?>
     <form method="post" style="margin-top: 15px;">
       <input type="hidden" name="account_identifier" value="<?php echo htmlspecialchars($account_identifier); ?>">
       <input type="hidden" name="regenerate_backup_codes" value="1">
@@ -599,6 +608,7 @@ if ($ldap_search) {
         Regenerate Backup Codes
       </button>
     </form>
+    <?php } ?>
     <?php } ?>
 
    </div>

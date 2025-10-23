@@ -11,9 +11,13 @@ set_page_access("user");
 $ldap_connection = open_ldap_connection();
 
 // Get user's DN
+$status_attr = $TOTP_ATTRS['status'];
+$enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+$scratch_attr = $TOTP_ATTRS['scratch_codes'];
+
 $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
   "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
-  array('dn', 'totpStatus', 'totpEnrolledDate', 'totpScratchCode', 'memberOf'));
+  array('dn', $status_attr, $enrolled_attr, $scratch_attr, 'memberOf'));
 
 if (!$user_search) {
   die("Failed to find user");
@@ -24,9 +28,12 @@ if ($user_entry['count'] == 0) {
   die("User not found");
 }
 
+$status_attr_lower = strtolower($status_attr);
+$enrolled_attr_lower = strtolower($enrolled_attr);
+
 $user_dn = $user_entry[0]['dn'];
-$totp_status = isset($user_entry[0]['totpstatus'][0]) ? $user_entry[0]['totpstatus'][0] : 'none';
-$totp_enrolled_date = isset($user_entry[0]['totpenrolleddate'][0]) ? $user_entry[0]['totpenrolleddate'][0] : null;
+$totp_status = isset($user_entry[0][$status_attr_lower][0]) ? $user_entry[0][$status_attr_lower][0] : 'none';
+$totp_enrolled_date = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_entry[0][$enrolled_attr_lower][0] : null;
 
 // Get backup code count
 $backup_code_count = totp_get_backup_code_count($ldap_connection, $user_dn);
@@ -37,6 +44,12 @@ $grace_period_remaining = null;
 
 if ($user_requires_mfa && $totp_status == 'pending' && $totp_enrolled_date) {
   $grace_period_remaining = totp_grace_period_remaining($totp_enrolled_date, $MFA_GRACE_PERIOD_DAYS);
+}
+
+// Check if MFA schema is available
+$schema_error = false;
+if ($MFA_ENABLED && !$MFA_SCHEMA_OK) {
+  $schema_error = true;
 }
 
 // Handle first code validation (AJAX)
@@ -55,7 +68,10 @@ if (isset($_POST['validate_first_code'])) {
 
 // Handle final enrolment form submission
 if (isset($_POST['enrol_mfa'])) {
-  if (!isset($_POST['code1']) || !isset($_POST['code2']) || !isset($_POST['time_window1'])) {
+  if ($schema_error) {
+    $error_message = "Multi-factor authentication is currently unavailable due to a configuration issue. Please contact your administrator.";
+  }
+  elseif (!isset($_POST['code1']) || !isset($_POST['code2']) || !isset($_POST['time_window1'])) {
     $error_message = "Please complete both verification steps.";
   }
   else {
@@ -91,7 +107,10 @@ if (isset($_POST['enrol_mfa'])) {
 
 // Handle disable MFA
 if (isset($_POST['disable_mfa'])) {
-  if (totp_disable($ldap_connection, $user_dn)) {
+  if ($schema_error) {
+    $error_message = "Multi-factor authentication is currently unavailable due to a configuration issue. Please contact your administrator.";
+  }
+  elseif (totp_disable($ldap_connection, $user_dn)) {
     $success_disable = true;
     $totp_status = 'disabled';
   }
@@ -119,6 +138,14 @@ render_header("Manage Multi-Factor Authentication");
       <div class="alert alert-danger">
         <p><strong>Multi-Factor Authentication Required</strong></p>
         <p>Your grace period for setting up MFA has expired. You must configure MFA below to continue using this system.</p>
+      </div>
+    <?php } ?>
+
+    <?php if ($schema_error) { ?>
+      <div class="alert alert-warning">
+        <p><strong>MFA Currently Unavailable</strong></p>
+        <p>Multi-factor authentication is currently unavailable due to a configuration issue. Please contact your system administrator to resolve this issue.</p>
+        <p><small>You can view your current MFA status below, but enrolment and configuration changes are temporarily disabled.</small></p>
       </div>
     <?php } ?>
 
@@ -235,7 +262,7 @@ render_header("Manage Multi-Factor Authentication");
           </div>
 
           <form method="POST">
-            <button type="submit" name="disable_mfa" class="btn btn-danger" onclick="return confirm('Are you sure you want to disable MFA? This will make your account less secure.');">
+            <button type="submit" name="disable_mfa" class="btn btn-danger" <?php if ($schema_error) echo 'disabled title="MFA schema not available"'; ?> onclick="return confirm('Are you sure you want to disable MFA? This will make your account less secure.');">
               Disable MFA
             </button>
           </form>
@@ -428,7 +455,7 @@ render_header("Manage Multi-Factor Authentication");
           </ol>
 
           <form method="POST">
-            <button type="submit" name="start_enrolment" class="btn btn-primary btn-lg btn-block">
+            <button type="submit" name="start_enrolment" class="btn btn-primary btn-lg btn-block" <?php if ($schema_error) echo 'disabled title="MFA schema not available"'; ?>>
               Set Up Multi-Factor Authentication
             </button>
           </form>

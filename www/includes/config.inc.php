@@ -166,6 +166,21 @@
  $MFA_GRACE_PERIOD_DAYS = (getenv('MFA_GRACE_PERIOD_DAYS') ? intval(getenv('MFA_GRACE_PERIOD_DAYS')) : 7);
  $MFA_TOTP_ISSUER = (getenv('MFA_TOTP_ISSUER') ? getenv('MFA_TOTP_ISSUER') : $ORGANISATION_NAME);
 
+ # MFA Schema Validation (set by entrypoint script)
+ $MFA_SCHEMA_OK = ((strcasecmp(getenv('MFA_SCHEMA_OK'),'TRUE') == 0) ? TRUE : FALSE);
+
+ # MFA is only fully operational if enabled AND schema is valid
+ $MFA_FULLY_OPERATIONAL = ($MFA_ENABLED == TRUE && $MFA_SCHEMA_OK == TRUE);
+
+ # TOTP LDAP Attribute Names (configurable to match your LDAP schema)
+ $TOTP_ATTRS = array(
+   'secret' => (getenv('TOTP_SECRET_ATTRIBUTE') ? getenv('TOTP_SECRET_ATTRIBUTE') : 'totpSecret'),
+   'status' => (getenv('TOTP_STATUS_ATTRIBUTE') ? getenv('TOTP_STATUS_ATTRIBUTE') : 'totpStatus'),
+   'enrolled_date' => (getenv('TOTP_ENROLLED_DATE_ATTRIBUTE') ? getenv('TOTP_ENROLLED_DATE_ATTRIBUTE') : 'totpEnrolledDate'),
+   'scratch_codes' => (getenv('TOTP_SCRATCH_CODES_ATTRIBUTE') ? getenv('TOTP_SCRATCH_CODES_ATTRIBUTE') : 'totpScratchCode'),
+   'objectclass' => (getenv('TOTP_OBJECTCLASS') ? getenv('TOTP_OBJECTCLASS') : 'totpUser')
+ );
+
  # Debugging
 
  $LDAP_DEBUG = ((strcasecmp(getenv('LDAP_DEBUG'),'TRUE') == 0) ? TRUE : FALSE);

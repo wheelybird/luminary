@@ -177,6 +177,102 @@ fi
 env_file_replace
 
 ########################
+#Check TOTP schema if MFA is enabled
+
+check_totp_schema() {
+  # Only check if MFA is enabled
+  if [ "${MFA_ENABLED,,}" != "true" ]; then
+    export MFA_SCHEMA_OK="true"
+    return 0
+  fi
+
+  echo "Checking TOTP schema availability..."
+
+  # Check if we have required LDAP connection details
+  if [ -z "$LDAP_URI" ] || [ -z "$LDAP_BASE_DN" ] || [ -z "$LDAP_ADMIN_BIND_DN" ] || [ -z "$LDAP_ADMIN_BIND_PWD" ]; then
+    echo "WARNING: LDAP connection details not fully configured, cannot verify TOTP schema" >&2
+    export MFA_SCHEMA_OK="false"
+    return 0
+  fi
+
+  # Get configured object class and attribute names (or use defaults)
+  totp_objectclass="${TOTP_OBJECTCLASS:-totpUser}"
+  totp_secret_attr="${TOTP_SECRET_ATTRIBUTE:-totpSecret}"
+  totp_status_attr="${TOTP_STATUS_ATTRIBUTE:-totpStatus}"
+  totp_enrolled_attr="${TOTP_ENROLLED_DATE_ATTRIBUTE:-totpEnrolledDate}"
+  totp_scratch_attr="${TOTP_SCRATCH_CODES_ATTRIBUTE:-totpScratchCode}"
+
+  # Query LDAP schema for TOTP object class
+  # Check cn=schema,cn=config (OpenLDAP) or cn=subschema (RFC 4512 standard location)
+  schema_check=$(ldapsearch -x -H "$LDAP_URI" \
+    -D "$LDAP_ADMIN_BIND_DN" \
+    -w "$LDAP_ADMIN_BIND_PWD" \
+    -b "cn=schema,cn=config" \
+    -LLL \
+    "(objectClass=olcSchemaConfig)" \
+    olcObjectClasses 2>/dev/null | grep -i "$totp_objectclass" || true)
+
+  # If not found in cn=schema,cn=config, try cn=subschema
+  if [ -z "$schema_check" ]; then
+    schema_check=$(ldapsearch -x -H "$LDAP_URI" \
+      -D "$LDAP_ADMIN_BIND_DN" \
+      -w "$LDAP_ADMIN_BIND_PWD" \
+      -b "cn=subschema" \
+      -s base \
+      -LLL \
+      objectClasses 2>/dev/null | grep -i "$totp_objectclass" || true)
+  fi
+
+  # Check if objectClass exists
+  if [ -z "$schema_check" ]; then
+    echo "WARNING: MFA is enabled but TOTP schema not found in LDAP" >&2
+    echo "         Object class '$totp_objectclass' not found in schema" >&2
+    echo "         MFA functionality will be disabled until schema is installed" >&2
+    echo "         See https://github.com/wheelybird/ldap-totp-schema for installation" >&2
+    export MFA_SCHEMA_OK="false"
+  else
+    # ObjectClass found, now check for required attributes
+    echo "TOTP object class found: $totp_objectclass"
+
+    missing_attrs=""
+    for attr in "$totp_secret_attr" "$totp_status_attr" "$totp_enrolled_attr" "$totp_scratch_attr"; do
+      attr_check=$(ldapsearch -x -H "$LDAP_URI" \
+        -D "$LDAP_ADMIN_BIND_DN" \
+        -w "$LDAP_ADMIN_BIND_PWD" \
+        -b "cn=schema,cn=config" \
+        -LLL \
+        "(objectClass=olcSchemaConfig)" \
+        olcAttributeTypes 2>/dev/null | grep -i "NAME '$attr'" || \
+        ldapsearch -x -H "$LDAP_URI" \
+        -D "$LDAP_ADMIN_BIND_DN" \
+        -w "$LDAP_ADMIN_BIND_PWD" \
+        -b "cn=subschema" \
+        -s base \
+        -LLL \
+        attributeTypes 2>/dev/null | grep -i "NAME '$attr'" || true)
+
+      if [ -z "$attr_check" ]; then
+        missing_attrs="$missing_attrs $attr"
+      fi
+    done
+
+    if [ -n "$missing_attrs" ]; then
+      echo "WARNING: TOTP object class found but required attributes missing:$missing_attrs" >&2
+      echo "         MFA functionality will be disabled until all attributes are installed" >&2
+      export MFA_SCHEMA_OK="false"
+    else
+      echo "TOTP schema fully configured: all required attributes found"
+      export MFA_SCHEMA_OK="true"
+    fi
+  fi
+
+  # Always return 0 to prevent container restart loop
+  return 0
+}
+
+check_totp_schema
+
+########################
 #Run Apache
 
 # first arg is `-f` or `--some-option`
