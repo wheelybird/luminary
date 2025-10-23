@@ -100,6 +100,19 @@ render_header("$ORGANISATION_NAME account manager");
   </div>
 
   <?php if ($IS_ADMIN): ?>
+  <?php
+  // Check MFA schema status dynamically for admin dashboard
+  $ldap_conn = open_ldap_connection();
+  $rfc2307bis = ldap_detect_rfc2307bis($ldap_conn);
+
+  // Check TOTP schema if MFA is enabled
+  if ($MFA_ENABLED == TRUE) {
+    $MFA_SCHEMA_OK = totp_check_schema($ldap_conn);
+    $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
+  }
+
+  ldap_close($ldap_conn);
+  ?>
   <div class="row" style="margin-top: 30px;">
     <div class="col-md-12">
       <div class="panel panel-info">
@@ -122,11 +135,7 @@ render_header("$ORGANISATION_NAME account manager");
                 <tr>
                   <th>RFC2307bis:</th>
                   <td>
-                    <?php
-                    $ldap_conn = open_ldap_connection();
-                    $rfc2307bis = ldap_detect_rfc2307bis($ldap_conn);
-                    ldap_close($ldap_conn);
-                    if ($rfc2307bis): ?>
+                    <?php if ($rfc2307bis): ?>
                       <span class="label label-success">Enabled</span>
                     <?php else: ?>
                       <span class="label label-default">Disabled</span>

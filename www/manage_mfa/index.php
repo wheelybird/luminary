@@ -38,6 +38,12 @@ $totp_enrolled_date = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_ent
 // Get backup code count
 $backup_code_count = totp_get_backup_code_count($ldap_connection, $user_dn);
 
+// Check MFA schema status dynamically if MFA is enabled
+if ($MFA_ENABLED == TRUE) {
+  $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
+  $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
+}
+
 // Check if user is in MFA-required group
 $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS);
 $grace_period_remaining = null;

@@ -28,6 +28,12 @@ if (isset($_POST["user_id"]) and isset($_POST["password"])) {
 
  if ($account_id != FALSE) {
 
+  // Check MFA schema status dynamically if MFA is enabled
+  if ($MFA_ENABLED == TRUE) {
+    $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
+    $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
+  }
+
   // Check MFA status if MFA is fully operational
   $mfa_redirect_needed = false;
   if ($MFA_FULLY_OPERATIONAL == TRUE && !empty($MFA_REQUIRED_GROUPS)) {

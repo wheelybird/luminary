@@ -166,11 +166,19 @@
  $MFA_GRACE_PERIOD_DAYS = (getenv('MFA_GRACE_PERIOD_DAYS') ? intval(getenv('MFA_GRACE_PERIOD_DAYS')) : 7);
  $MFA_TOTP_ISSUER = (getenv('MFA_TOTP_ISSUER') ? getenv('MFA_TOTP_ISSUER') : $ORGANISATION_NAME);
 
- # MFA Schema Validation (set by entrypoint script)
- $MFA_SCHEMA_OK = ((strcasecmp(getenv('MFA_SCHEMA_OK'),'TRUE') == 0) ? TRUE : FALSE);
+ # MFA Schema Validation
+ # We check this dynamically rather than relying on environment variables
+ # because environment variables set during entrypoint don't propagate to Apache worker processes
+ $MFA_SCHEMA_OK = FALSE;
+ if ($MFA_ENABLED == TRUE) {
+   // We'll check this when needed to avoid unnecessary LDAP queries on every page load
+   // The check is performed in pages that need it (home page, MFA management, etc.)
+   $MFA_SCHEMA_OK = NULL; // NULL means "not yet checked"
+ }
 
  # MFA is only fully operational if enabled AND schema is valid
- $MFA_FULLY_OPERATIONAL = ($MFA_ENABLED == TRUE && $MFA_SCHEMA_OK == TRUE);
+ # This will be determined dynamically when needed
+ $MFA_FULLY_OPERATIONAL = NULL; // Will be set when schema check is performed
 
  # TOTP LDAP Attribute Names (configurable to match your LDAP schema)
  $TOTP_ATTRS = array(

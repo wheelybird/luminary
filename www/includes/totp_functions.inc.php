@@ -8,6 +8,70 @@
  */
 
 /**
+ * Check if the TOTP schema is installed in LDAP
+ *
+ * @param resource $ldap_connection Active LDAP connection
+ * @return bool True if schema is complete, false otherwise
+ */
+function totp_check_schema($ldap_connection) {
+  global $TOTP_ATTRS;
+
+  if (!$ldap_connection) {
+    return false;
+  }
+
+  $totp_objectclass = $TOTP_ATTRS['objectclass'];
+  $totp_secret_attr = $TOTP_ATTRS['secret'];
+  $totp_status_attr = $TOTP_ATTRS['status'];
+  $totp_enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+  $totp_scratch_attr = $TOTP_ATTRS['scratch_codes'];
+
+  // Check if objectClass exists in schema
+  $oc_search = @ldap_read($ldap_connection, "cn=subschema", "(objectClass=*)", array("objectClasses"));
+  $schema_found = false;
+
+  if ($oc_search) {
+    $schema_entry = ldap_get_entries($ldap_connection, $oc_search);
+    if (isset($schema_entry[0]['objectclasses'])) {
+      foreach ($schema_entry[0]['objectclasses'] as $oc) {
+        if (stripos($oc, $totp_objectclass) !== false) {
+          $schema_found = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!$schema_found) {
+    return false;
+  }
+
+  // Check for required attributes
+  $attr_search = @ldap_read($ldap_connection, "cn=subschema", "(objectClass=*)", array("attributeTypes"));
+  if (!$attr_search) {
+    return false;
+  }
+
+  $attr_entry = ldap_get_entries($ldap_connection, $attr_search);
+  if (!isset($attr_entry[0]['attributetypes'])) {
+    return false;
+  }
+
+  $found_attrs = array();
+  foreach ($attr_entry[0]['attributetypes'] as $attr) {
+    if (stripos($attr, "NAME '$totp_secret_attr'") !== false) $found_attrs[] = $totp_secret_attr;
+    if (stripos($attr, "NAME '$totp_status_attr'") !== false) $found_attrs[] = $totp_status_attr;
+    if (stripos($attr, "NAME '$totp_enrolled_attr'") !== false) $found_attrs[] = $totp_enrolled_attr;
+    if (stripos($attr, "NAME '$totp_scratch_attr'") !== false) $found_attrs[] = $totp_scratch_attr;
+  }
+
+  $required_attrs = array($totp_secret_attr, $totp_status_attr, $totp_enrolled_attr, $totp_scratch_attr);
+  $missing_attrs = array_diff($required_attrs, $found_attrs);
+
+  return empty($missing_attrs);
+}
+
+/**
  * Generate a random Base32-encoded TOTP secret
  *
  * @param int $length Length of the secret in bytes (default: 20 for 160 bits)
