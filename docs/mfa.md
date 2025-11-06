@@ -1,6 +1,6 @@
 # Multi-Factor Authentication
 
-LDAP User Manager includes comprehensive support for TOTP (Time-based One-Time Password) multi-factor authentication, with TOTP secrets stored directly in your LDAP directory.
+Luminary includes comprehensive support for TOTP (Time-based One-Time Password) multi-factor authentication, with TOTP secrets stored directly in your LDAP directory.
 
 ## Overview
 
@@ -50,7 +50,7 @@ docker run \
   -e MFA_REQUIRED_GROUPS=admins,developers \
   -e MFA_GRACE_PERIOD_DAYS=7 \
   -e MFA_TOTP_ISSUER="Example Ltd" \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 ### Configuration Variables
@@ -176,9 +176,9 @@ Administrators see an MFA status panel on the home page showing:
 
 ### Combined Setup
 
-LDAP User Manager works alongside [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp) to provide complete MFA for VPN access:
+Luminary works alongside [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp) to provide complete MFA for VPN access:
 
-1. **User Management**: Create accounts in LDAP User Manager
+1. **User Management**: Create accounts in Luminary
 2. **MFA Enrolment**: Users enrol via the web interface
 3. **LDAP Storage**: TOTP secrets stored in LDAP
 4. **VPN Authentication**: OpenVPN server validates password+TOTP
@@ -217,7 +217,7 @@ Each backup code can only be used once and is marked as used in LDAP.
 
 **Solution**:
 1. Install the TOTP schema from [ldap-totp-schema](https://github.com/wheelybird/ldap-totp-schema)
-2. Restart the LDAP User Manager container
+2. Restart the Luminary container
 3. Check the System Status panel (admin home page) to verify schema detection
 
 ### QR Code Won't Scan
@@ -340,7 +340,7 @@ If using MFA with multiple systems (VPN, SSH, web apps):
 
 1. **Shared LDAP**: All systems read from the same LDAP directory
 2. **Same Secret**: One TOTP secret works across all systems
-3. **Unified Management**: Users enrol once via LDAP User Manager
+3. **Unified Management**: Users enrol once via Luminary
 4. **Consistent Policy**: MFA requirements apply everywhere
 
 ### Audit Logging

@@ -1,6 +1,6 @@
 # Configuration Reference
 
-LDAP User Manager is configured entirely through environment variables. This document lists all available configuration options organised by category.
+Luminary is configured entirely through environment variables. This document lists all available configuration options organised by category.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ LDAP User Manager is configured entirely through environment variables. This doc
 
 ## Mandatory Settings
 
-These variables must be set for LDAP User Manager to function:
+These variables must be set for Luminary to function:
 
 ### `LDAP_URI`
 

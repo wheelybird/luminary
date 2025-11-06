@@ -1,10 +1,12 @@
-# LDAP User Manager
+# Luminary
+
+> **Note:** This project was previously known as **ldap-user-manager**. If you're looking for the ldap-user-manager project, you're in the right place - it's now called Luminary!
 
 A web-based interface for managing LDAP user accounts and groups, with self-service password management and multi-factor authentication support.
 
 ## Overview
 
-LDAP User Manager is a web application designed to simplify LDAP directory management through an intuitive web interface. It's built to work seamlessly with OpenLDAP and runs as a Docker container, making it easy to deploy alongside LDAP servers like [osixia/openldap](https://hub.docker.com/r/osixia/openldap/).
+Luminary is a web application designed to simplify LDAP directory management through an intuitive web interface. It's built to work seamlessly with OpenLDAP and runs as a Docker container, making it easy to deploy alongside LDAP servers like [osixia/openldap](https://hub.docker.com/r/osixia/openldap/).
 
 This project complements [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp) by providing a user-friendly way for administrators to manage accounts and for users to self-enrol in multi-factor authentication.
 
@@ -22,10 +24,10 @@ This project complements [openvpn-server-ldap-otp](https://github.com/wheelybird
 
 ## Quick Start
 
-This example shows how to run LDAP User Manager for testing, using osixia/openldap:
+This example shows how to run Luminary for testing, using osixia/openldap:
 
 ### 1. Start OpenLDAP
-s
+
 ```bash
 docker run \
   --detach \
@@ -39,12 +41,12 @@ docker run \
   osixia/openldap:latest
 ```
 
-### 2. Start LDAP User Manager
+### 2. Start Luminary
 
 ```bash
 docker run \
   --detach \
-  --name ldap-user-manager \
+  --name luminary \
   -p 8080:80 \
   -p 8443:443 \
   -e SERVER_HOSTNAME="localhost" \
@@ -56,7 +58,7 @@ docker run \
   -e LDAP_ADMIN_BIND_PWD="admin_password" \
   -e LDAP_IGNORE_CERT_ERRORS="true" \
   --link openldap:openldap \
-  wheelybird/ldap-user-manager:latest
+  wheelybird/luminary:latest
 ```
 
 ### 3. Run the Setup Wizard
@@ -73,7 +75,7 @@ Once setup is complete, you can log in at https://localhost:8443 with your admin
 
 ## Configuration
 
-LDAP User Manager is configured entirely through environment variables. The main categories are:
+Luminary is configured entirely through environment variables. The main categories are:
 
 | Documentation | Description |
 |---------------|-------------|
@@ -101,7 +103,7 @@ For sensitive values like passwords, you can use Docker secrets or mounted files
 
 ## Multi-Factor Authentication
 
-LDAP User Manager includes comprehensive MFA support with LDAP-backed TOTP (Time-based One-Time Passwords):
+Luminary includes comprehensive MFA support with LDAP-backed TOTP (Time-based One-Time Passwords):
 
 - Users can self-enrol using QR codes with their authenticator apps
 - Administrators can enforce MFA for specific groups
@@ -115,7 +117,7 @@ For detailed setup instructions, see the [MFA documentation](docs/mfa.md).
 
 This project is designed to work alongside [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp):
 
-1. Use LDAP User Manager to create and manage user accounts
+1. Use Luminary to create and manage user accounts
 2. Users enrol in MFA through the web interface
 3. TOTP secrets are stored in LDAP
 4. OpenVPN server reads the same LDAP directory for authentication
@@ -130,16 +132,16 @@ This is an open-source project. Contributions, bug reports, and feature requests
 ### Building from Source
 
 ```bash
-git clone https://github.com/wheelybird/ldap-user-manager.git
-cd ldap-user-manager
-docker build -t ldap-user-manager .
+git clone https://github.com/wheelybird/luminary.git
+cd luminary
+docker build -t luminary .
 ```
 
 ## Support
 
 - **Documentation**: See the [docs/](docs/) directory for detailed guides
-- **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/wheelybird/ldap-user-manager/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/wheelybird/ldap-user-manager/discussions)
+- **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/wheelybird/luminary/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/wheelybird/luminary/discussions)
 
 ## Licence
 

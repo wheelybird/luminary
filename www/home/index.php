@@ -5,18 +5,28 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
 
+// Include TOTP functions if MFA is enabled (needed for schema check)
+if ($MFA_ENABLED == TRUE) {
+  include_once "totp_functions.inc.php";
+}
+
 set_page_access("user");
 
-// Check user's MFA status
+// Open LDAP connection for all checks
 $ldap_connection = open_ldap_connection();
+
+// Check MFA schema status dynamically if MFA is enabled
+if ($MFA_ENABLED == TRUE) {
+  $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
+  $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
+}
+
+// Check user's MFA status
 $mfa_status = array('needs_setup' => false);
 
 if ($MFA_FULLY_OPERATIONAL && !empty($MFA_REQUIRED_GROUPS)) {
-  include_once "totp_functions.inc.php";
   $mfa_status = totp_get_user_mfa_status($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS, $MFA_GRACE_PERIOD_DAYS);
 }
-
-ldap_close($ldap_connection);
 
 render_header("$ORGANISATION_NAME account manager");
 
@@ -101,17 +111,11 @@ render_header("$ORGANISATION_NAME account manager");
 
   <?php if ($IS_ADMIN): ?>
   <?php
-  // Check MFA schema status dynamically for admin dashboard
+  // Check RFC2307bis for admin dashboard
   $ldap_conn = open_ldap_connection();
   $rfc2307bis = ldap_detect_rfc2307bis($ldap_conn);
-
-  // Check TOTP schema if MFA is enabled
-  if ($MFA_ENABLED == TRUE) {
-    $MFA_SCHEMA_OK = totp_check_schema($ldap_conn);
-    $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
-  }
-
   ldap_close($ldap_conn);
+  // Note: MFA_SCHEMA_OK and MFA_FULLY_OPERATIONAL already set above
   ?>
   <div class="row" style="margin-top: 30px;">
     <div class="col-md-12">

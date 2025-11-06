@@ -1,6 +1,6 @@
 # Running Without Docker
 
-This guide covers running LDAP User Manager directly on a server without Docker, using either Apache with mod_php or Nginx with PHP-FPM.
+This guide covers running Luminary directly on a server without Docker, using either Apache with mod_php or Nginx with PHP-FPM.
 
 ## Table of Contents
 
@@ -44,13 +44,13 @@ sudo yum install php php-ldap php-mbstring php-xml php-curl
 
 ```bash
 # Clone the repository
-git clone https://github.com/wheelybird/ldap-user-manager.git
-cd ldap-user-manager
+git clone https://github.com/wheelybird/luminary.git
+cd luminary
 
 # Or download a release
-wget https://github.com/wheelybird/ldap-user-manager/archive/refs/heads/main.tar.gz
+wget https://github.com/wheelybird/luminary/archive/refs/heads/main.tar.gz
 tar -xzf main.tar.gz
-cd ldap-user-manager-main
+cd luminary-main
 ```
 
 ### 2. Install PHPMailer
@@ -67,18 +67,18 @@ mv PHPMailer-7.0.0 PHPMailer
 
 ```bash
 # Copy application files to web root
-sudo mkdir -p /var/www/ldap-user-manager
-sudo cp -r www/* /var/www/ldap-user-manager/
-sudo chown -R www-data:www-data /var/www/ldap-user-manager
+sudo mkdir -p /var/www/luminary
+sudo cp -r www/* /var/www/luminary/
+sudo chown -R www-data:www-data /var/www/luminary
 
 # Create required directories
-sudo mkdir -p /var/www/ldap-user-manager/sessions
-sudo chmod 700 /var/www/ldap-user-manager/sessions
+sudo mkdir -p /var/www/luminary/sessions
+sudo chmod 700 /var/www/luminary/sessions
 ```
 
 ### 4. Create Configuration File
 
-Create `/etc/ldap-user-manager.conf`:
+Create `/etc/luminary.conf`:
 
 ```bash
 # LDAP Configuration
@@ -114,8 +114,8 @@ EMAIL_DOMAIN=example.com
 Set appropriate permissions:
 
 ```bash
-sudo chmod 600 /etc/ldap-user-manager.conf
-sudo chown www-data:www-data /etc/ldap-user-manager.conf
+sudo chmod 600 /etc/luminary.conf
+sudo chown www-data:www-data /etc/luminary.conf
 ```
 
 ---
@@ -137,32 +137,32 @@ sudo a2enmod rewrite
 
 ### Configure Virtual Host
 
-Create `/etc/apache2/sites-available/ldap-user-manager.conf`:
+Create `/etc/apache2/sites-available/luminary.conf`:
 
 ```apache
 <VirtualHost *:80>
     ServerName ldap.example.com
     ServerAdmin admin@example.com
 
-    DocumentRoot /var/www/ldap-user-manager
+    DocumentRoot /var/www/luminary
     DirectoryIndex index.php
 
-    <Directory /var/www/ldap-user-manager>
+    <Directory /var/www/luminary>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
 
         # PHP configuration
-        php_value session.save_path "/var/www/ldap-user-manager/sessions"
+        php_value session.save_path "/var/www/luminary/sessions"
         php_value session.gc_maxlifetime 600
 
         # Load environment variables from config file
-        SetEnv CONFIG_FILE /etc/ldap-user-manager.conf
+        SetEnv CONFIG_FILE /etc/luminary.conf
     </Directory>
 
     # Logging
-    ErrorLog ${APACHE_LOG_DIR}/ldap-user-manager-error.log
-    CustomLog ${APACHE_LOG_DIR}/ldap-user-manager-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/luminary-error.log
+    CustomLog ${APACHE_LOG_DIR}/luminary-access.log combined
 
     # Redirect HTTP to HTTPS (when SSL is configured)
     # RewriteEngine On
@@ -173,33 +173,33 @@ Create `/etc/apache2/sites-available/ldap-user-manager.conf`:
 
 ### HTTPS Virtual Host (Recommended)
 
-Create `/etc/apache2/sites-available/ldap-user-manager-ssl.conf`:
+Create `/etc/apache2/sites-available/luminary-ssl.conf`:
 
 ```apache
 <VirtualHost *:443>
     ServerName ldap.example.com
     ServerAdmin admin@example.com
 
-    DocumentRoot /var/www/ldap-user-manager
+    DocumentRoot /var/www/luminary
     DirectoryIndex index.php
 
-    <Directory /var/www/ldap-user-manager>
+    <Directory /var/www/luminary>
         Options -Indexes +FollowSymLinks
         AllowOverride All
         Require all granted
 
         # PHP configuration
-        php_value session.save_path "/var/www/ldap-user-manager/sessions"
+        php_value session.save_path "/var/www/luminary/sessions"
         php_value session.gc_maxlifetime 600
 
         # Load environment variables from config file
-        SetEnv CONFIG_FILE /etc/ldap-user-manager.conf
+        SetEnv CONFIG_FILE /etc/luminary.conf
     </Directory>
 
     # SSL Configuration
     SSLEngine on
-    SSLCertificateFile /etc/ssl/certs/ldap-user-manager.crt
-    SSLCertificateKeyFile /etc/ssl/private/ldap-user-manager.key
+    SSLCertificateFile /etc/ssl/certs/luminary.crt
+    SSLCertificateKeyFile /etc/ssl/private/luminary.key
     SSLCertificateChainFile /etc/ssl/certs/ca-bundle.crt
 
     # Modern SSL configuration
@@ -207,8 +207,8 @@ Create `/etc/apache2/sites-available/ldap-user-manager-ssl.conf`:
     SSLCipherSuite HIGH:!aNULL:!MD5
 
     # Logging
-    ErrorLog ${APACHE_LOG_DIR}/ldap-user-manager-ssl-error.log
-    CustomLog ${APACHE_LOG_DIR}/ldap-user-manager-ssl-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/luminary-ssl-error.log
+    CustomLog ${APACHE_LOG_DIR}/luminary-ssl-access.log combined
 </VirtualHost>
 ```
 
@@ -216,8 +216,8 @@ Create `/etc/apache2/sites-available/ldap-user-manager-ssl.conf`:
 
 ```bash
 # Enable the site
-sudo a2ensite ldap-user-manager
-sudo a2ensite ldap-user-manager-ssl
+sudo a2ensite luminary
+sudo a2ensite luminary-ssl
 
 # Disable default site (optional)
 sudo a2dissite 000-default
@@ -247,14 +247,14 @@ sudo systemctl enable php8.1-fpm
 
 ### Configure PHP-FPM Pool
 
-Edit `/etc/php/8.1/fpm/pool.d/ldap-user-manager.conf`:
+Edit `/etc/php/8.1/fpm/pool.d/luminary.conf`:
 
 ```ini
-[ldap-user-manager]
+[luminary]
 user = www-data
 group = www-data
 
-listen = /run/php/ldap-user-manager.sock
+listen = /run/php/luminary.sock
 listen.owner = www-data
 listen.group = www-data
 listen.mode = 0660
@@ -266,11 +266,11 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 
 ; PHP configuration
-php_admin_value[session.save_path] = /var/www/ldap-user-manager/sessions
+php_admin_value[session.save_path] = /var/www/luminary/sessions
 php_admin_value[session.gc_maxlifetime] = 600
 
 ; Load environment variables from config file
-env[CONFIG_FILE] = /etc/ldap-user-manager.conf
+env[CONFIG_FILE] = /etc/luminary.conf
 ```
 
 Restart PHP-FPM:
@@ -281,7 +281,7 @@ sudo systemctl restart php8.1-fpm
 
 ### Configure Nginx Server Block
 
-Create `/etc/nginx/sites-available/ldap-user-manager`:
+Create `/etc/nginx/sites-available/luminary`:
 
 ```nginx
 # HTTP Server (redirects to HTTPS)
@@ -300,12 +300,12 @@ server {
     listen [::]:443 ssl http2;
     server_name ldap.example.com;
 
-    root /var/www/ldap-user-manager;
+    root /var/www/luminary;
     index index.php index.html;
 
     # SSL Configuration
-    ssl_certificate /etc/ssl/certs/ldap-user-manager.crt;
-    ssl_certificate_key /etc/ssl/private/ldap-user-manager.key;
+    ssl_certificate /etc/ssl/certs/luminary.crt;
+    ssl_certificate_key /etc/ssl/private/luminary.key;
     ssl_trusted_certificate /etc/ssl/certs/ca-bundle.crt;
 
     # Modern SSL configuration
@@ -319,8 +319,8 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
 
     # Logging
-    access_log /var/log/nginx/ldap-user-manager-access.log;
-    error_log /var/log/nginx/ldap-user-manager-error.log;
+    access_log /var/log/nginx/luminary-access.log;
+    error_log /var/log/nginx/luminary-error.log;
 
     # PHP handling
     location / {
@@ -328,13 +328,13 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/ldap-user-manager.sock;
+        fastcgi_pass unix:/run/php/luminary.sock;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
 
         # Pass environment variables
-        fastcgi_param CONFIG_FILE /etc/ldap-user-manager.conf;
+        fastcgi_param CONFIG_FILE /etc/luminary.conf;
     }
 
     # Deny access to sensitive files
@@ -352,7 +352,7 @@ server {
 
 ```bash
 # Create symlink
-sudo ln -s /etc/nginx/sites-available/ldap-user-manager /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/luminary /etc/nginx/sites-enabled/
 
 # Test configuration
 sudo nginx -t
@@ -367,7 +367,7 @@ sudo systemctl restart nginx
 
 ### Load Environment Variables in PHP
 
-Modify `/var/www/ldap-user-manager/includes/config.inc.php` to load from the configuration file:
+Modify `/var/www/luminary/includes/config.inc.php` to load from the configuration file:
 
 Add at the beginning of the file:
 
@@ -386,11 +386,11 @@ if ($config_file && file_exists($config_file)) {
 
 ### Alternative: Use .htaccess (Apache only)
 
-Create `/var/www/ldap-user-manager/.htaccess`:
+Create `/var/www/luminary/.htaccess`:
 
 ```apache
 # Load environment variables from config
-SetEnvIf Request_URI ".*" CONFIG_FILE=/etc/ldap-user-manager.conf
+SetEnvIf Request_URI ".*" CONFIG_FILE=/etc/luminary.conf
 
 # Read and set each variable
 # Note: This requires manual parsing or a script
@@ -398,7 +398,7 @@ SetEnvIf Request_URI ".*" CONFIG_FILE=/etc/ldap-user-manager.conf
 
 ### Alternative: Export System-Wide
 
-Add to `/etc/environment` or create `/etc/profile.d/ldap-user-manager.sh`:
+Add to `/etc/environment` or create `/etc/profile.d/luminary.sh`:
 
 ```bash
 #!/bin/bash
@@ -420,11 +420,11 @@ export LDAP_ADMINS_GROUP="admins"
 
 ```bash
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/ssl/private/ldap-user-manager.key \
-    -out /etc/ssl/certs/ldap-user-manager.crt \
+    -keyout /etc/ssl/private/luminary.key \
+    -out /etc/ssl/certs/luminary.crt \
     -subj "/CN=ldap.example.com"
 
-sudo chmod 600 /etc/ssl/private/ldap-user-manager.key
+sudo chmod 600 /etc/ssl/private/luminary.key
 ```
 
 ### Let's Encrypt Certificate (Production)
@@ -482,9 +482,9 @@ Restart the web server after changes.
 Ensure the sessions directory exists and has correct permissions:
 
 ```bash
-sudo mkdir -p /var/www/ldap-user-manager/sessions
-sudo chown www-data:www-data /var/www/ldap-user-manager/sessions
-sudo chmod 700 /var/www/ldap-user-manager/sessions
+sudo mkdir -p /var/www/luminary/sessions
+sudo chown www-data:www-data /var/www/luminary/sessions
+sudo chmod 700 /var/www/luminary/sessions
 ```
 
 ### LDAP Connection Errors
@@ -506,9 +506,9 @@ php -i | grep -i ldap
 Ensure web server user can read application files:
 
 ```bash
-sudo chown -R www-data:www-data /var/www/ldap-user-manager
-sudo chmod -R 755 /var/www/ldap-user-manager
-sudo chmod 700 /var/www/ldap-user-manager/sessions
+sudo chown -R www-data:www-data /var/www/luminary
+sudo chmod -R 755 /var/www/luminary
+sudo chmod 700 /var/www/luminary/sessions
 ```
 
 ### Configuration Not Loading
@@ -530,10 +530,10 @@ Check application logs:
 
 ```bash
 # Apache
-sudo tail -f /var/log/apache2/ldap-user-manager-error.log
+sudo tail -f /var/log/apache2/luminary-error.log
 
 # Nginx
-sudo tail -f /var/log/nginx/ldap-user-manager-error.log
+sudo tail -f /var/log/nginx/luminary-error.log
 
 # PHP-FPM
 sudo tail -f /var/log/php8.1-fpm.log
@@ -549,10 +549,10 @@ Ensure PHPMailer is accessible. The application expects it at `/opt/PHPMailer`. 
 
 ```bash
 # Find references to PHPMailer
-grep -r "PHPMailer" /var/www/ldap-user-manager/includes/
+grep -r "PHPMailer" /var/www/luminary/includes/
 ```
 
-Edit the path in `/var/www/ldap-user-manager/includes/email_functions.inc.php`.
+Edit the path in `/var/www/luminary/includes/email_functions.inc.php`.
 
 ### Performance Tuning
 

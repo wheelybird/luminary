@@ -1,5 +1,10 @@
 FROM php:8.4-apache
 
+LABEL org.opencontainers.image.authors="wheelybird@wheelybird.com"
+LABEL org.opencontainers.image.title="Luminary"
+LABEL org.opencontainers.image.description="Web-based LDAP user management with self-service MFA"
+LABEL org.opencontainers.image.source="https://github.com/wheelybird/luminary"
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libldb-dev libldap2-dev libldap-common \

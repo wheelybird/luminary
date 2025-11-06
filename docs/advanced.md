@@ -17,7 +17,7 @@ This document covers advanced configuration scenarios, customisation options, an
 
 ## HTTPS Certificates
 
-By default, LDAP User Manager generates a self-signed certificate on first startup. For production use, you should provide proper SSL certificates.
+By default, Luminary generates a self-signed certificate on first startup. For production use, you should provide proper SSL certificates.
 
 ### Using Your Own Certificates
 
@@ -29,7 +29,7 @@ docker run \
   -e SERVER_CERT_FILENAME=my-cert.crt \
   -e SERVER_KEY_FILENAME=my-key.key \
   -e CA_CERT_FILENAME=ca-bundle.crt \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 Certificate files should be in PEM format.
@@ -49,7 +49,7 @@ docker run \
   -v /etc/letsencrypt/live/your-domain:/opt/ssl:ro \
   -e SERVER_CERT_FILENAME=fullchain.pem \
   -e SERVER_KEY_FILENAME=privkey.pem \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 **Certificate Renewal**: Restart the container after certificate renewal so Apache picks up the new certificates.
@@ -68,7 +68,7 @@ This serves the interface over unencrypted HTTP. **Do not use in production.**
 
 ## Sending Emails
 
-LDAP User Manager can send emails when creating or updating accounts, and for account requests.
+Luminary can send emails when creating or updating accounts, and for account requests.
 
 ### Basic SMTP Configuration
 
@@ -82,7 +82,7 @@ docker run \
   -e EMAIL_DOMAIN=example.com \
   -e EMAIL_FROM_ADDRESS=noreply@example.com \
   -e EMAIL_FROM_NAME="Example Ltd User Management" \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 ### Gmail Configuration
@@ -150,7 +150,7 @@ Enable SMTP debugging:
 
 Check container logs:
 ```bash
-docker logs ldap-user-manager
+docker logs luminary
 ```
 
 ---
@@ -285,7 +285,7 @@ Replace the default logo with your organisation's branding:
 docker run \
   -v /path/to/logo.png:/custom/logo.png:ro \
   -e CUSTOM_LOGO=/custom/logo.png \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 **Recommended**: PNG format, transparent background, approximately 200x50 pixels.
@@ -298,7 +298,7 @@ Add custom styling to match your corporate identity:
 docker run \
   -v /path/to/custom.css:/custom/styles.css:ro \
   -e CUSTOM_STYLES=/custom/styles.css \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 **Example custom.css**:
@@ -339,7 +339,7 @@ These values appear in:
 
 ## Reverse Proxy Setup
 
-Running LDAP User Manager behind a reverse proxy like Nginx or Apache.
+Running Luminary behind a reverse proxy like Nginx or Apache.
 
 ### Nginx Configuration
 
@@ -352,7 +352,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
 
     location / {
-        proxy_pass http://ldap-user-manager:80;
+        proxy_pass http://luminary:80;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -366,7 +366,7 @@ server {
 docker run \
   -e NO_HTTPS=TRUE \
   -e SERVER_HOSTNAME=users.example.com \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 ### Subpath Deployment
@@ -376,7 +376,7 @@ To serve at `https://example.com/ldap/`:
 **Nginx**:
 ```nginx
 location /ldap/ {
-    proxy_pass http://ldap-user-manager:80/;
+    proxy_pass http://luminary:80/;
     proxy_set_header Host $host;
 }
 ```
@@ -397,8 +397,8 @@ location /ldap/ {
     SSLCertificateFile /path/to/cert.pem
     SSLCertificateKeyFile /path/to/key.pem
 
-    ProxyPass / http://ldap-user-manager:80/
-    ProxyPassReverse / http://ldap-user-manager:80/
+    ProxyPass / http://luminary:80/
+    ProxyPassReverse / http://luminary:80/
 
     ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "https"
@@ -463,8 +463,8 @@ services:
       - ldap-config:/etc/ldap/slapd.d
       - ./totp-schema.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/totp-schema.ldif
 
-  ldap-user-manager:
-    image: wheelybird/ldap-user-manager:latest
+  luminary:
+    image: wheelybird/luminary:latest
     ports:
       - "8080:80"
       - "8443:443"
@@ -495,8 +495,8 @@ volumes:
 version: '3.8'
 
 services:
-  ldap-user-manager:
-    image: wheelybird/ldap-user-manager:latest
+  luminary:
+    image: wheelybird/luminary:latest
     ports:
       - "8443:443"
     environment:
@@ -533,7 +533,7 @@ secrets:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ldap-user-manager-config
+  name: luminary-config
 data:
   LDAP_URI: "ldap://openldap.default.svc.cluster.local"
   LDAP_BASE_DN: "dc=example,dc=com"
@@ -545,7 +545,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ldap-user-manager-secrets
+  name: luminary-secrets
 type: Opaque
 stringData:
   ldap-admin-password: "changeme"
@@ -554,41 +554,41 @@ stringData:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ldap-user-manager
+  name: luminary
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ldap-user-manager
+      app: luminary
   template:
     metadata:
       labels:
-        app: ldap-user-manager
+        app: luminary
     spec:
       containers:
-      - name: ldap-user-manager
-        image: wheelybird/ldap-user-manager:latest
+      - name: luminary
+        image: wheelybird/luminary:latest
         ports:
         - containerPort: 443
           name: https
         envFrom:
         - configMapRef:
-            name: ldap-user-manager-config
+            name: luminary-config
         env:
         - name: LDAP_ADMIN_BIND_PWD
           valueFrom:
             secretKeyRef:
-              name: ldap-user-manager-secrets
+              name: luminary-secrets
               key: ldap-admin-password
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ldap-user-manager
+  name: luminary
 spec:
   selector:
-    app: ldap-user-manager
+    app: luminary
   ports:
   - port: 443
     targetPort: 443
@@ -612,7 +612,7 @@ Enable verbose logging to troubleshoot issues:
 
 View logs:
 ```bash
-docker logs -f ldap-user-manager
+docker logs -f luminary
 ```
 
 ### Common Issues
@@ -642,5 +642,5 @@ docker logs -f ldap-user-manager
 ### Getting Help
 
 - **Documentation**: Check the [docs/](.) directory
-- **Issues**: Search or create an issue on [GitHub](https://github.com/wheelybird/ldap-user-manager/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/wheelybird/ldap-user-manager/discussions)
+- **Issues**: Search or create an issue on [GitHub](https://github.com/wheelybird/luminary/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/wheelybird/luminary/discussions)
