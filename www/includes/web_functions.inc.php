@@ -17,7 +17,7 @@ $GOOD_ICON = "&#9745;";
 $WARN_ICON = "&#9888;";
 $FAIL_ICON = "&#9940;";
 
-$JS_EMAIL_REGEX='/^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;';
+$JS_EMAIL_REGEX='/^[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}$/u;';
 
 if (isset($_SERVER['HTTPS']) and
    ($_SERVER['HTTPS'] == 'on' || $_SERVER['HTTPS'] == 1) or
@@ -437,13 +437,17 @@ function render_js_username_check(){
 
  function check_entity_name_validity(name,div_id) {
 
-  var check_regex = /$USERNAME_REGEX/;
+  var check_regex = /$USERNAME_REGEX/u;
+  var element = document.getElementById(div_id);
+
+  // Add null check to prevent errors (fixes #214)
+  if (!element) return;
 
   if (! check_regex.test(name) ) {
-   document.getElementById(div_id).classList.add("has-error");
+   element.classList.add("has-error");
   }
   else {
-   document.getElementById(div_id).classList.remove("has-error");
+   element.classList.remove("has-error");
   }
 
  }
@@ -461,15 +465,41 @@ EoCheckJS;
 
 ######################################################
 
+/**
+ * Generate a username from first and last name using the configured USERNAME_FORMAT.
+ *
+ * Supported template variables:
+ *   {first_name}          - Full first name
+ *   {first_name_initial}  - First letter of first name
+ *   {last_name}           - Full last name
+ *   {last_name_initial}   - First letter of last name
+ *
+ * Examples:
+ *   {first_name_initial}{last_name}       -> jsmith (for John Smith)
+ *   {last_name}{first_name_initial}       -> smithj
+ *   {first_name_initial}{last_name_initial} -> js
+ *   {first_name}.{last_name}              -> john.smith
+ *
+ * Note: Automatically removes spaces and hyphens from compound names (Jean-Paul -> jeanpaul)
+ *
+ * @param string $fn First name
+ * @param string $ln Last name
+ * @return string Generated username
+ */
 function generate_username($fn,$ln) {
 
   global $USERNAME_FORMAT;
 
+  // Handle multiple first names with hyphens/spaces (fixes #186)
+  // Remove spaces and hyphens from names for username generation
+  $fn_clean = str_replace(array(' ', '-'), '', $fn);
+  $ln_clean = str_replace(array(' ', '-'), '', $ln);
+
   $username = $USERNAME_FORMAT;
-  $username = str_replace('{first_name}',strtolower($fn), $username);
-  $username = str_replace('{first_name_initial}',strtolower($fn[0]), $username);
-  $username = str_replace('{last_name}',strtolower($ln), $username);
-  $username = str_replace('{last_name_initial}',strtolower($ln[0]), $username);
+  $username = str_replace('{first_name}',strtolower($fn_clean), $username);
+  $username = str_replace('{first_name_initial}',strtolower($fn_clean[0]), $username);
+  $username = str_replace('{last_name}',strtolower($ln_clean), $username);
+  $username = str_replace('{last_name_initial}',strtolower($ln_clean[0]), $username);
 
   return $username;
 
@@ -493,8 +523,15 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
 <script>
  function update_username() {
 
-  var first_name = document.getElementById('$firstname_field_id').value;
-  var last_name  = document.getElementById('$lastname_field_id').value;
+  var first_name_elem = document.getElementById('$firstname_field_id');
+  var last_name_elem  = document.getElementById('$lastname_field_id');
+  var username_elem   = document.getElementById('$username_field_id');
+
+  // Add null checks to prevent errors (fixes #214)
+  if (!first_name_elem || !last_name_elem || !username_elem) return;
+
+  var first_name = first_name_elem.value;
+  var last_name  = last_name_elem.value;
   var template = '$USERNAME_FORMAT';
 
   var actual_username = template;
@@ -506,7 +543,7 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
 
   check_entity_name_validity(actual_username,'$username_div_id');
 
-  document.getElementById('$username_field_id').value = actual_username;
+  username_elem.value = actual_username;
 
  }
 
@@ -667,7 +704,7 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
        <div class="col-sm-6" id="<?php print $attribute; ?>_input_div">
        <?php if($inputtype == "multipleinput") {
              ?><div class="input-group">
-                  <input type="text" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>[]" value="<?php if (isset($values_r[0])) { print $values_r[0]; } ?>">
+                  <input type="text" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>[]" value="<?php if (isset($values_r[0])) { print htmlspecialchars(decode_ldap_value($values_r[0]), ENT_QUOTES, 'UTF-8'); } ?>">
                   <div class="input-group-btn"><button type="button" class="btn btn-default" onclick="add_field_to('<?php print $attribute; ?>')">+</i></button></div>
               </div>
             <?php
@@ -675,7 +712,11 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
                  unset($values_r['count']);
                  $remaining_values = array_slice($values_r, 1);
                  print "<script>";
-                 foreach($remaining_values as $this_value) { print "add_field_to('$attribute','$this_value');"; }
+                 foreach($remaining_values as $this_value) {
+                   $decoded_value = decode_ldap_value($this_value);
+                   $escaped_value = htmlspecialchars($decoded_value, ENT_QUOTES, 'UTF-8');
+                   print "add_field_to('$attribute','$escaped_value');";
+                 }
                  print "</script>";
                }
              }

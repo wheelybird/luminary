@@ -26,7 +26,7 @@ else {
   $group_cn = urldecode($group_cn);
 }
 
-if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/",$group_cn)) {
+if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$group_cn)) {
 ?>
  <div class="alert alert-danger">
   <p class="text-center">The group name is invalid.</p>
@@ -103,13 +103,13 @@ foreach ($attribute_map as $attribute => $attr_r) {
 
     if (is_array($_POST[$attribute])) {
       foreach($_POST[$attribute] as $key => $value) {
-        if ($value != "") { $this_attribute[$key] = filter_var($value, FILTER_SANITIZE_FULL_SPECIAL_CHARS); }
+        if ($value != "") { $this_attribute[$key] = trim($value); }
       }
       $this_attribute['count'] = count($this_attribute);
     }
     elseif ($_POST[$attribute] != "") {
       $this_attribute['count'] = 1;
-      $this_attribute[0] = filter_var($_POST[$attribute], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+      $this_attribute[0] = trim($_POST[$attribute]);
     }
 
     if ($this_attribute != $$attribute) {
@@ -128,7 +128,13 @@ foreach ($attribute_map as $attribute => $attr_r) {
 }
 
 if (!isset($gidnumber[0]) or !is_numeric($gidnumber[0])) {
-  $gidnumber[0]=ldap_get_highest_id($ldap_connection,$type="gid");
+  if ($new_group or $initialise_group) {
+    // For new groups, use next available GID (highest + 1) to prevent duplicates (fixes #230)
+    $gidnumber[0]=ldap_get_highest_id($ldap_connection,$type="gid") + 1;
+  } else {
+    // For existing groups without a GID, use highest
+    $gidnumber[0]=ldap_get_highest_id($ldap_connection,$type="gid");
+  }
   $gidnumber['count']=1;
 }
 
@@ -147,9 +153,12 @@ if (isset($_POST["update_members"])) {
 
   $updated_membership = array();
 
-  foreach ($_POST['membership'] as $index => $member) {
-    if (is_numeric($index)) {
-     array_push($updated_membership,filter_var($member, FILTER_SANITIZE_FULL_SPECIAL_CHARS));
+  // Check if membership array exists before iterating (fixes #230 - empty group validation)
+  if (isset($_POST['membership']) && is_array($_POST['membership'])) {
+    foreach ($_POST['membership'] as $index => $member) {
+      if (is_numeric($index)) {
+       array_push($updated_membership, trim($member));
+      }
     }
   }
 
@@ -347,13 +356,13 @@ ldap_close($ldap_connection);
       <div class="panel panel-default">
 
         <div class="panel-heading clearfix">
-          <h3 class="panel-title pull-left" style="padding-top: 7.5px;"><?php print $group_cn; ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h3>
+          <h3 class="panel-title pull-left" style="padding-top: 7.5px;"><?php print htmlspecialchars(decode_ldap_value($group_cn), ENT_QUOTES, 'UTF-8'); ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h3>
           <button class="btn btn-warning pull-right" onclick="show_delete_group_button();" <?php if ($group_cn == $LDAP["admins_group"]) { print "disabled"; } ?>>Delete group</button>
           <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/groups.php" method="post" enctype="multipart/form-data"><input type="hidden" name="delete_group" value="<?php print $group_cn; ?>"><button class="btn btn-danger pull-right invisible" id="delete_group">Confirm deletion</button></form>
         </div>
 
         <ul class="list-group">
-          <li class="list-group-item"><?php print $full_dn; ?></li>
+          <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($full_dn), ENT_QUOTES, 'UTF-8'); ?></li>
         </li>
 
         <div class="panel-body">
@@ -377,11 +386,12 @@ ldap_close($ldap_connection);
                 <ul class="list-group" id="membership_list">
                   <?php
                   foreach ($group_members as $member) {
+                    $member_display = htmlspecialchars(decode_ldap_value($member), ENT_QUOTES, 'UTF-8');
                     if ($group_cn == $LDAP['admins_group'] and $member == $USER_ID) {
-                      print "<div class='list-group-item' style='opacity: 0.5; pointer-events:none;'>$member</div>\n";
+                      print "<div class='list-group-item' style='opacity: 0.5; pointer-events:none;'>{$member_display}</div>\n";
                     }
                     else {
-                      print "<li class='list-group-item'>$member</li>\n";
+                      print "<li class='list-group-item'>{$member_display}</li>\n";
                     }
                   }
                   ?>
@@ -421,7 +431,8 @@ ldap_close($ldap_connection);
                 <ul class="list-group">
                   <?php
                    foreach ($non_members as $nonmember) {
-                     print "<li class='list-group-item'>$nonmember</li>\n";
+                     $nonmember_display = htmlspecialchars(decode_ldap_value($nonmember), ENT_QUOTES, 'UTF-8');
+                     print "<li class='list-group-item'>{$nonmember_display}</li>\n";
                    }
                  ?>
                 </ul>

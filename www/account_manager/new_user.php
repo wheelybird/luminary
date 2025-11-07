@@ -75,7 +75,7 @@ foreach ($attribute_map as $attribute => $attr_r) {
 
     if (is_array($_POST[$attribute]) and count($_POST[$attribute]) > 0) {
       foreach($_POST[$attribute] as $key => $value) {
-        if ($value != "") { $this_attribute[$key] = filter_var($value, FILTER_SANITIZE_FULL_SPECIAL_CHARS); }
+        if ($value != "") { $this_attribute[$key] = trim($value); }
       }
       if (count($this_attribute) > 0) {
         $this_attribute['count'] = count($this_attribute);
@@ -84,7 +84,7 @@ foreach ($attribute_map as $attribute => $attr_r) {
     }
     elseif ($_POST[$attribute] != "") {
       $this_attribute['count'] = 1;
-      $this_attribute[0] = filter_var($_POST[$attribute], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+      $this_attribute[0] = trim($_POST[$attribute]);
       $$attribute = $this_attribute;
     }
 
@@ -106,10 +106,10 @@ foreach ($attribute_map as $attribute => $attr_r) {
 
 if (isset($_GET['account_request'])) {
 
-  $givenname[0]=filter_var($_GET['first_name'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+  $givenname[0]=trim($_GET['first_name']);
   $new_account_r['givenname'] = $givenname[0];
 
-  $sn[0]=filter_var($_GET['last_name'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+  $sn[0]=trim($_GET['last_name']);
   $new_account_r['sn'] = $sn[0];
 
   $mail[0]=filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
@@ -130,18 +130,22 @@ if (isset($_GET['account_request'])) {
 
 if (isset($_GET['account_request']) or isset($_POST['create_account'])) {
 
+  // Handle mononym users (only surname) - fixes #213, #171
+  $givenname_val = isset($givenname[0]) ? $givenname[0] : '';
+  $sn_val = isset($sn[0]) ? $sn[0] : '';
+
   if (!isset($uid[0])) {
-    $uid[0] = generate_username($givenname[0],$sn[0]);
+    $uid[0] = generate_username($givenname_val, $sn_val);
     $new_account_r['uid'] = $uid;
     unset($new_account_r['uid']['count']);
   }
 
   if (!isset($cn[0])) {
     if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE) {
-      $cn[0] = $givenname[0] . $sn[0];
+      $cn[0] = $givenname_val . $sn_val;
     }
     else {
-      $cn[0] = $givenname[0] . " " . $sn[0];
+      $cn[0] = trim($givenname_val . " " . $sn_val);
     }
     $new_account_r['cn'] = $cn;
     unset($new_account_r['cn']['count']);
@@ -157,8 +161,9 @@ if (isset($_POST['create_account'])) {
  $account_identifier = $new_account_r[$account_attribute][0];
  $this_cn=$cn[0];
  $this_mail=$mail[0];
- $this_givenname=$givenname[0];
- $this_sn=$sn[0];
+ // Handle mononym users (fixes #213, #171)
+ $this_givenname = isset($givenname[0]) ? $givenname[0] : '';
+ $this_sn = isset($sn[0]) ? $sn[0] : '';
  $this_password=$password[0];
 
  if (!isset($this_cn) or $this_cn == "") { $invalid_cn = TRUE; }
@@ -169,7 +174,7 @@ if (isset($_POST['create_account'])) {
  if (isset($this_mail) and !is_valid_email($this_mail)) { $invalid_email = TRUE; }
  if (preg_match("/\"|'/",$password)) { $invalid_password = TRUE; }
  if ($password != $_POST['password_match']) { $mismatched_passwords = TRUE; }
- if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/",$account_identifier)) { $invalid_account_identifier = TRUE; }
+ if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$account_identifier)) { $invalid_account_identifier = TRUE; }
  if (isset($_POST['send_email']) and isset($mail) and $EMAIL_SENDING_ENABLED == TRUE) { $send_user_email = TRUE; }
 
  if (     isset($this_givenname)
@@ -230,10 +235,13 @@ if (isset($_POST['create_account'])) {
 
       include_once "mail_functions.inc.php";
 
+      // Handle mononym users for email (fixes #213, #171)
+      $full_name = trim($this_givenname . " " . $this_sn);
+
       $mail_body = parse_mail_text($new_account_mail_body, $password, $account_identifier, $this_givenname, $this_sn);
       $mail_subject = parse_mail_text($new_account_mail_subject, $password, $account_identifier, $this_givenname, $this_sn);
 
-      $sent_email = send_email($this_mail,"$this_givenname $this_sn",$mail_subject,$mail_body);
+      $sent_email = send_email($this_mail, $full_name, $mail_subject, $mail_body);
       $creation_message = "The account was created";
       if ($sent_email) {
         $creation_message .= " and an email sent to $this_mail.";

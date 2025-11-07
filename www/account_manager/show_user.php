@@ -108,13 +108,13 @@ if ($ldap_search) {
 
       if (is_array($_POST[$attribute])) {
         foreach($_POST[$attribute] as $key => $value) {
-          if ($value != "") { $this_attribute[$key] = filter_var($value, FILTER_SANITIZE_FULL_SPECIAL_CHARS); }
+          if ($value != "") { $this_attribute[$key] = trim($value); }
         }
         $this_attribute['count'] = count($this_attribute);
       }
       elseif ($_POST[$attribute] != "") {
         $this_attribute['count'] = 1;
-        $this_attribute[0] = filter_var($_POST[$attribute], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+        $this_attribute[0] = trim($_POST[$attribute]);
       }
 
       if ($this_attribute != $$attribute) {
@@ -148,18 +148,22 @@ if ($ldap_search) {
 
  if (isset($_POST['update_account'])) {
 
+  // Handle mononym users (only surname) - fixes #213, #171
+  $givenname_val = isset($givenname[0]) ? $givenname[0] : '';
+  $sn_val = isset($sn[0]) ? $sn[0] : '';
+
   if (!isset($uid[0])) {
-    $uid[0] = generate_username($givenname[0],$sn[0]);
+    $uid[0] = generate_username($givenname_val, $sn_val);
     $to_update['uid'] = $uid;
     unset($to_update['uid']['count']);
   }
 
   if (!isset($cn[0])) {
     if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE) {
-      $cn[0] = $givenname[0] . $sn[0];
+      $cn[0] = $givenname_val . $sn_val;
     }
     else {
-      $cn[0] = $givenname[0] . " " . $sn[0];
+      $cn[0] = trim($givenname_val . " " . $sn_val);
     }
     $to_update['cn'] = $cn;
     unset($to_update['cn']['count']);
@@ -172,7 +176,7 @@ if ($ldap_search) {
     if ((!is_numeric($_POST['pass_score']) or $_POST['pass_score'] < 3) and $ACCEPT_WEAK_PASSWORDS != TRUE) { $weak_password = TRUE; }
     if (preg_match("/\"|'/",$password)) { $invalid_password = TRUE; }
     if ($_POST['password'] != $_POST['password_match']) { $mismatched_passwords = TRUE; }
-    if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/",$account_identifier)) { $invalid_username = TRUE; }
+    if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$account_identifier)) { $invalid_username = TRUE; }
 
     if ( !$mismatched_passwords
        and !$weak_password
@@ -213,10 +217,15 @@ if ($ldap_search) {
 
       include_once "mail_functions.inc.php";
 
-      $mail_body = parse_mail_text($new_account_mail_body, $password, $account_identifier, $givenname[0], $sn[0]);
-      $mail_subject = parse_mail_text($new_account_mail_subject, $password, $account_identifier, $givenname[0], $sn[0]);
+      // Handle mononym users for email (fixes #213, #171)
+      $givenname_for_mail = isset($givenname[0]) ? $givenname[0] : '';
+      $sn_for_mail = isset($sn[0]) ? $sn[0] : '';
+      $full_name = trim($givenname_for_mail . " " . $sn_for_mail);
 
-      $sent_email = send_email($mail[0],"{$givenname[0]} {$sn[0]}",$mail_subject,$mail_body);
+      $mail_body = parse_mail_text($new_account_mail_body, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+      $mail_subject = parse_mail_text($new_account_mail_subject, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+
+      $sent_email = send_email($mail[0], $full_name, $mail_subject, $mail_body);
       if ($sent_email) {
         $sent_email_message .= "  An email sent to {$mail[0]}.";
       }
@@ -470,12 +479,12 @@ if ($ldap_search) {
 
   <div class="panel panel-default">
     <div class="panel-heading clearfix">
-     <span class="panel-title pull-left"><h3><?php print $account_identifier; ?></h3></span>
+     <span class="panel-title pull-left"><h3><?php print htmlspecialchars(decode_ldap_value($account_identifier), ENT_QUOTES, 'UTF-8'); ?></h3></span>
      <button class="btn btn-warning pull-right align-self-end" style="margin-top: auto;" onclick="show_delete_user_button();" <?php if ($account_identifier == $USER_ID) { print "disabled"; }?>>Delete account</button>
      <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/index.php" method="post"><input type="hidden" name="delete_user" value="<?php print urlencode($account_identifier); ?>"><button class="btn btn-danger pull-right invisible" id="delete_user">Confirm deletion</button></form>
     </div>
     <ul class="list-group">
-      <li class="list-group-item"><?php print $dn; ?></li>
+      <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($dn), ENT_QUOTES, 'UTF-8'); ?></li>
     </li>
     <div class="panel-body">
      <form class="form-horizontal" action="" enctype="multipart/form-data" method="post">
@@ -647,11 +656,12 @@ if ($ldap_search) {
            <ul class="list-group" id="member_of_list">
             <?php
             foreach ($member_of as $group) {
+              $group_display = htmlspecialchars(decode_ldap_value($group), ENT_QUOTES, 'UTF-8');
               if ($group == $LDAP["admins_group"] and $USER_ID == $account_identifier) {
-                print "<div class='list-group-item' style='opacity: 0.5; pointer-events:none;'>{$group}</div>\n";
+                print "<div class='list-group-item' style='opacity: 0.5; pointer-events:none;'>{$group_display}</div>\n";
               }
               else {
-                print "<li class='list-group-item'>$group</li>\n";
+                print "<li class='list-group-item'>{$group_display}</li>\n";
               }
             }
             ?>
@@ -692,7 +702,8 @@ if ($ldap_search) {
            <ul class="list-group">
             <?php
              foreach ($not_member_of as $group) {
-               print "<li class='list-group-item'>$group</li>\n";
+               $group_display = htmlspecialchars(decode_ldap_value($group), ENT_QUOTES, 'UTF-8');
+               print "<li class='list-group-item'>{$group_display}</li>\n";
              }
             ?>
            </ul>

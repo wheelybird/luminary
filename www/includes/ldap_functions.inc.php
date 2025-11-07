@@ -610,9 +610,13 @@ function ldap_new_group($ldap_connection,$group_name,$initial_member="",$extra_a
      if ($LDAP['group_membership_uses_uid'] == FALSE and $initial_member != "") { $initial_member = "{$LDAP['account_attribute']}=$initial_member,{$LDAP['user_dn']}"; }
 
      $new_group_array=array( 'objectClass' => $LDAP['group_objectclasses'],
-                             'cn' => $new_group,
-                             $LDAP['group_membership_attribute'] => $initial_member
+                             'cn' => $new_group
                            );
+
+     // Only add membership attribute if initial_member is not empty (fixes #230 - empty group creation)
+     if ($initial_member != "") {
+       $new_group_array[$LDAP['group_membership_attribute']] = $initial_member;
+     }
 
      $new_group_array = array_merge($new_group_array,$extra_attributes);
 
@@ -779,7 +783,7 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
 
       $this_r = array();
       $kv = explode(":", $this_attr);
-      $attr_name = strtolower(filter_var($kv[0], FILTER_SANITIZE_FULL_SPECIAL_CHARS));
+      $attr_name = strtolower(trim($kv[0]));
       $this_r['inputtype'] = "singleinput";
 
       if (substr($attr_name, -1) == '+') {
@@ -792,17 +796,17 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
         $attr_name = rtrim($attr_name, '^');
       }
 
-      if (preg_match('/^[a-zA-Z0-9\-]+$/', $attr_name) == 1) {
+      if (preg_match('/^[\p{L}\p{N}\-]+$/u', $attr_name) == 1) {
 
         if (isset($kv[1]) and $kv[1] != "") {
-          $this_r['label'] = filter_var($kv[1], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+          $this_r['label'] = trim($kv[1]);
         }
         else {
           $this_r['label'] = $attr_name;
         }
 
         if (isset($kv[2]) and $kv[2] != "") {
-          $this_r['default'] = filter_var($kv[2], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+          $this_r['default'] = trim($kv[2]);
         }
 
         $to_merge[$attr_name] = $this_r;
@@ -953,6 +957,17 @@ function ldap_delete_account($ldap_connection,$username) {
 
  if (isset($username)) {
 
+  // First, remove user from all groups (fixes #215, #169)
+  $user_groups = ldap_user_group_membership($ldap_connection, $username);
+
+  foreach ($user_groups as $group) {
+    $removed = ldap_delete_member_from_group($ldap_connection, $group, $username);
+    if (!$removed) {
+      error_log("$log_prefix Warning: Failed to remove $username from group $group during account deletion",0);
+    }
+  }
+
+  // Now delete the user account
   $delete_query = "{$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ",{$LDAP['user_dn']}";
   $delete = @ ldap_delete($ldap_connection, $delete_query);
 
@@ -1150,6 +1165,117 @@ function ldap_detect_rfc2307bis($ldap_connection) {
 
   }
 
+}
+
+###################################
+# Unicode Support Helper Functions
+###################################
+
+/**
+ * Validate text fields (names, descriptions) - allows Unicode characters
+ *
+ * @param string $text The text to validate
+ * @param int $min Minimum length (default: 1)
+ * @param int $max Maximum length (default: 100)
+ * @return bool True if valid, false otherwise
+ */
+function validate_text($text, $min = 1, $max = 100) {
+    mb_internal_encoding('UTF-8');
+
+    $length = mb_strlen($text);
+    if ($length < $min || $length > $max) {
+        return false;
+    }
+
+    // Allow Unicode letters, combining marks, spaces, hyphens, apostrophes
+    return preg_match('/^[\p{L}\p{M}\s\'-]+$/u', $text) === 1;
+}
+
+/**
+ * Validate usernames - allows Unicode letters/numbers plus common symbols
+ *
+ * @param string $username The username to validate
+ * @return bool True if valid, false otherwise
+ */
+function validate_username($username) {
+    mb_internal_encoding('UTF-8');
+
+    $length = mb_strlen($username);
+    if ($length < 2 || $length > 64) {
+        return false;
+    }
+
+    // Unicode letters, numbers, underscore, dot, hyphen
+    if (!preg_match('/^[\p{L}\p{N}_.-]+$/u', $username)) {
+        return false;
+    }
+
+    // Don't allow leading/trailing dots or hyphens
+    if (preg_match('/^[.-]|[.-]$/u', $username)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Sanitize value for LDAP storage
+ *
+ * @param string $value The value to sanitize
+ * @return string The sanitized value safe for LDAP
+ */
+function sanitize_for_ldap($value) {
+    $value = trim($value);
+    return ldap_escape($value, '', LDAP_ESCAPE_DN);
+}
+
+/**
+ * Sanitize value for HTML display
+ *
+ * @param string $value The value to sanitize
+ * @return string The sanitized value safe for HTML
+ */
+function sanitize_for_html($value) {
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Decode HTML entities from LDAP values for backward compatibility
+ *
+ * Converts old data that was incorrectly stored with HTML entities
+ * (e.g., "M&uuml;ller" -> "Müller") back to proper UTF-8.
+ *
+ * This function handles legacy data created before Unicode support
+ * was properly implemented. As users edit entries, data will naturally
+ * migrate to pure UTF-8 storage.
+ *
+ * @param string|array $value Value from LDAP (can be string or array)
+ * @return string|array Decoded value in the same format as input
+ *
+ * @deprecated TODO: Remove in v2.0 after data migration period
+ */
+function decode_ldap_value($value) {
+    // Handle arrays (multi-valued attributes)
+    if (is_array($value)) {
+        $decoded = array();
+        foreach ($value as $key => $val) {
+            // Skip 'count' key that LDAP arrays include
+            if ($key !== 'count') {
+                $decoded[$key] = html_entity_decode($val, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } else {
+                $decoded[$key] = $val;
+            }
+        }
+        return $decoded;
+    }
+
+    // Handle single values
+    if (is_string($value)) {
+        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    // Return unchanged for other types (null, bool, etc.)
+    return $value;
 }
 
 ?>

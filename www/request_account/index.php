@@ -28,14 +28,14 @@ if($_POST) {
     array_push($error_messages, "You didn't enter your first name.");
   }
   else {
-    $firstname=filter_var($_POST['firstname'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $firstname=trim($_POST['firstname']);
   }
 
   if (! isset($_POST['lastname']) or $_POST['lastname'] == "") {
     array_push($error_messages, "You didn't enter your first name.");
   }
   else {
-    $lastname=filter_var($_POST['lastname'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $lastname=trim($_POST['lastname']);
   }
 
   if (isset($_POST['email']) and $_POST['email'] != "") {
@@ -43,7 +43,7 @@ if($_POST) {
   }
 
   if (isset($_POST['notes']) and $_POST['notes'] != "") {
-    $notes=filter_var($_POST['notes'], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $notes=trim($_POST['notes']);
   }
 
 

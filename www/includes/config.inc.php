@@ -7,8 +7,24 @@
  $DEFAULT_USER_GROUP = (getenv('DEFAULT_USER_GROUP') ? getenv('DEFAULT_USER_GROUP') : 'everybody');
  $DEFAULT_USER_SHELL = (getenv('DEFAULT_USER_SHELL') ? getenv('DEFAULT_USER_SHELL') : '/bin/bash');
  $ENFORCE_SAFE_SYSTEM_NAMES = ((strcasecmp(getenv('ENFORCE_SAFE_SYSTEM_NAMES'),'FALSE') == 0) ? FALSE : TRUE);
+
+ # USERNAME_FORMAT template variables:
+ #   {first_name}          - Full first name (e.g., "john")
+ #   {first_name_initial}  - First letter of first name (e.g., "j")
+ #   {last_name}           - Full last name (e.g., "smith")
+ #   {last_name_initial}   - First letter of last name (e.g., "s")
+ #
+ # Common formats:
+ #   {first_name}-{last_name}              -> john-smith
+ #   {first_name}.{last_name}              -> john.smith
+ #   {first_name_initial}{last_name}       -> jsmith
+ #   {last_name}{first_name_initial}       -> smithj
+ #   {first_name_initial}{last_name_initial} -> js
+ #   {first_name_initial}.{last_name}      -> j.smith
+ #
+ # Note: Spaces and hyphens in names are automatically removed (Jean-Paul -> jeanpaul)
  $USERNAME_FORMAT = (getenv('USERNAME_FORMAT') ? getenv('USERNAME_FORMAT') : '{first_name}-{last_name}');
- $USERNAME_REGEX  = (getenv('USERNAME_REGEX')  ? getenv('USERNAME_REGEX') : '^[a-z][a-zA-Z0-9\._-]{3,32}$');   #We use the username regex for groups too.
+ $USERNAME_REGEX  = (getenv('USERNAME_REGEX')  ? getenv('USERNAME_REGEX') : '^[\p{L}\p{N}_.-]{2,64}$');   #We use the username regex for groups too. Supports Unicode characters.
 
  if (getenv('PASSWORD_HASH')) { $PASSWORD_HASH = strtoupper(getenv('PASSWORD_HASH')); }
  $ACCEPT_WEAK_PASSWORDS = ((strcasecmp(getenv('ACCEPT_WEAK_PASSWORDS'),'TRUE') == 0) ? TRUE : FALSE);
