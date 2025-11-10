@@ -33,15 +33,15 @@ else {
  }
  ?>
  <div class="container">
-  <div class="panel panel-default">
-   <div class="panel-heading text-center">Password for <?php print $LDAP['admin_bind_dn']; ?></div>
-   <div class="panel-body text-center">
+  <div class="card">
+   <div class="card-header text-center">Password for <?php print $LDAP['admin_bind_dn']; ?></div>
+   <div class="card-body text-center">
     <form class="form-inline" action='' method='post'>
-     <div class="form-group">
+     <div class="row mb-3">
       <input type='password' class="form-control" name='admin_password'>
      </div>
-     <div class="form-group">
-      <input type='submit' class="btn btn-default" value='Log in'>
+     <div class="row mb-3">
+      <input type='submit' class="btn btn-secondary" value='Log in'>
      </div>
     </form>
    </div>

@@ -10,16 +10,20 @@
  $MODULES = array(
                     'log_in'          => 'hidden_on_login',
                     'home'            => 'auth',
+                    'user_profile'    => 'auth',
                     'change_password' => 'auth',
                     'account_manager' => 'admin',
+                    'system_config'   => 'admin',
                   );
 
  #Module display names (optional - if not set, directory name is used)
  $MODULE_NAMES = array(
                     'log_in'          => 'Log In',
                     'home'            => 'Home',
+                    'user_profile'    => 'My Profile',
                     'change_password' => 'Change Password',
                     'account_manager' => 'Account Manager',
+                    'system_config'   => 'System Config',
                     'log_out'         => 'Log Out',
                     'request_account' => 'Request Account',
                     'manage_mfa'      => 'Manage MFA',

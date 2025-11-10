@@ -48,11 +48,13 @@ The password for the `LDAP_ADMIN_BIND_DN` user.
 
 ### `LDAP_ADMINS_GROUP`
 
+**Default:** `admins`
+
 The name of the LDAP group whose members can access the user management interface.
 
 **Example:** `admins`
 
-**Note:** Members of this group have full access to create, modify, and delete user accounts and groups.
+**Note:** Members of this group have full access to create, modify, and delete user accounts and groups. This group is created automatically during the setup wizard.
 
 ---
 
@@ -271,35 +273,97 @@ The default login shell assigned to new user accounts.
 - `/bin/zsh`
 - `/usr/sbin/nologin` - For accounts that shouldn't have shell access
 
-### `ENFORCE_SAFE_SYSTEM_NAMES`
+### `ENFORCE_USERNAME_VALIDATION`
 
 **Default:** `TRUE`
 
-When enabled, usernames and group names must be valid POSIX account names (lowercase letters, numbers, hyphens, underscores, starting with a letter).
+Controls whether usernames and group names are validated against the `USERNAME_REGEX` pattern, and how the Common Name (CN) is formatted.
 
-**Set to `FALSE`** to allow more flexible naming (e.g., uppercase letters, spaces).
+**When TRUE:**
+- Usernames must match the `USERNAME_REGEX` pattern
+- CN is formatted without spaces and with accents removed (e.g., "Hæppy Testør" → "haeppytestor")
+- Validation errors shown if invalid characters used
+
+**When FALSE:**
+- Username validation is skipped (more permissive)
+- CN preserves spaces and Unicode (e.g., "Hæppy Testør" → "Hæppy Testør")
+
+**Important:** Usernames are ALWAYS converted to ASCII (regardless of this setting) to meet POSIX and LDAP requirements. This ensures compatibility with:
+- Home directories (RFC 2307 homeDirectory uses IA5String/ASCII)
+- Email addresses (LDAP mail attribute uses IA5String/ASCII only - see note below)
+- Filesystem paths and POSIX tools
+
+**LDAP Schema Unicode Limitations:**
+
+The following standard LDAP attributes use **IA5String syntax** (ASCII-only, codes 0-127):
+- `mail` (email address) - RFC 4524
+- `homeDirectory` (home path) - RFC 2307/2307bis
+- `uid` (username) - RFC 2307
+
+While modern standards exist (EAI for email/RFC 6531, UTF-8 filesystems for paths), **LDAP schema definitions remain ASCII-only** for these attributes. This is a schema constraint, not an OS limitation:
+
+- **Linux/Unix:** Modern filesystems (ext4, XFS, Btrfs) fully support UTF-8 paths like `/home/hæppy`
+- **Email Systems:** Modern MTAs support Unicode addresses via EAI (RFC 6531)
+- **LDAP Schema:** Still uses 1990s-era IA5String for compatibility
+
+**Alternative schemas exist** (like `intlMailAdr` for Unicode email) but aren't widely deployed. Active Directory has better Unicode support for some attributes, but still follows RFC standards for interoperability.
+
+**Display name attributes** (`cn`, `givenName`, `sn`) DO support Unicode via DirectoryString syntax - only technical identifiers (username, email, paths) are ASCII-restricted.
+
+This is why usernames are transliterated to ASCII: e.g., "hæppy@example.com" becomes "haeppy@example.com"
+
+**Examples:**
+- User "Hæppy Testør" → username `haeppy-testor` (always ASCII-safe)
+- With `TRUE`: CN = `haeppytestor`, validation enforced
+- With `FALSE`: CN = `Hæppy Testør`, validation skipped
+
+### `ENFORCE_SAFE_SYSTEM_NAMES`
+
+⚠️ **DEPRECATED** - Use `ENFORCE_USERNAME_VALIDATION` instead
+
+**Default:** `TRUE`
+
+This setting is maintained for backward compatibility only. It behaves identically to `ENFORCE_USERNAME_VALIDATION`.
+
+**Migration:** Replace `ENFORCE_SAFE_SYSTEM_NAMES` with `ENFORCE_USERNAME_VALIDATION` in your configuration. If both are set, `ENFORCE_USERNAME_VALIDATION` takes precedence.
 
 ### `USERNAME_FORMAT`
 
 **Default:** `{first_name}-{last_name}`
 
-Template for auto-generating usernames from user details.
+Template for auto-generating usernames from user details. Spaces and hyphens in names are automatically removed (e.g., Jean-Paul becomes jeanpaul).
 
 **Available placeholders:**
-- `{first_name}` - User's first name
-- `{last_name}` - User's last name
-- `{email_address}` - Email address
+- `{first_name}` - User's full first name
+- `{first_name_initial}` - First letter of first name
+- `{last_name}` - User's full last name
+- `{last_name_initial}` - First letter of last name
 
 **Examples:**
-- `{first_name}.{last_name}` - john.smith
-- `{first_name}{last_name}` - johnsmith
-- `{last_name}` - smith
+- `{first_name}-{last_name}` → john-smith (default)
+- `{first_name}.{last_name}` → john.smith
+- `{first_name_initial}{last_name}` → jsmith
+- `{last_name}{first_name_initial}` → smithj
+- `{first_name_initial}{last_name_initial}` → js
+- `{first_name_initial}.{last_name}` → j.smith
+
+**Note:** All generated usernames are automatically converted to lowercase.
 
 ### `USERNAME_REGEX`
 
-**Default:** `^[a-z][a-zA-Z0-9\._-]{3,32}$`
+**Default:** `^[\p{L}\p{N}_.-]{2,64}$`
 
-Regular expression for validating usernames. Only used when `ENFORCE_SAFE_SYSTEM_NAMES=TRUE`.
+Regular expression for validating usernames and group names. Supports Unicode characters for international names.
+
+**Pattern explanation:**
+- `\p{L}` - Any Unicode letter (supports international characters)
+- `\p{N}` - Any Unicode number
+- `_.-` - Underscore, period, and hyphen are allowed
+- `{2,64}` - Length between 2 and 64 characters
+
+**Only used when:** `ENFORCE_USERNAME_VALIDATION=TRUE`
+
+**Note:** This regex validates the format/length, but usernames are always converted to ASCII for POSIX/LDAP compatibility. For example, "José" passes this regex but becomes username "jose".
 
 ### `PASSWORD_HASH`
 
@@ -400,6 +464,137 @@ LDAP objectClass name for users with MFA. Only change if using a custom schema.
 
 ---
 
+## User Profile Settings
+
+Configuration for the self-service user profile module, which allows users to edit their own LDAP attributes.
+
+### `USER_EDITABLE_ATTRIBUTES`
+
+**Default:** None (uses built-in safe defaults)
+
+Comma-separated list of additional LDAP attributes that users can edit in their profile. These are merged with the built-in safe defaults.
+
+**Built-in editable attributes** (always available):
+- `telephoneNumber` - Telephone Number
+- `mobile` - Mobile Number
+- `displayName` - Display Name
+- `description` - About Me (textarea)
+- `title` - Job Title
+- `jpegPhoto` - Profile Photo (JPEG only, max 500KB)
+- `sshPublicKey` - SSH Public Keys (multi-valued)
+
+**Format:**
+```
+attribute:Label:Default:InputType
+```
+
+Where:
+- `attribute` - LDAP attribute name (required)
+- `Label` - Display label in the form (optional, defaults to attribute name)
+- `Default` - Default value when creating entries (optional)
+- `InputType` - Form input type (optional, defaults to `text`)
+
+**Supported input types:**
+- `text` - Single-line text input (default)
+- `textarea` - Multi-line text area (for descriptions, notes)
+- `tel` - Telephone number input (mobile keyboard support)
+- `email` - Email address input (with validation)
+- `url` - URL input (with validation)
+- `checkbox` - Boolean checkbox (TRUE/FALSE values)
+- `multipleinput` - Multiple values with + button
+- `binary` - File upload (for images, certificates)
+
+**Suffix shortcuts** (alternative to InputType parameter):
+- `attribute+` - Multi-valued attribute (same as `:multipleinput`)
+- `attribute^` - Binary/file upload (same as `:binary`)
+
+**Examples:**
+```bash
+# Simple attribute with default label
+USER_EDITABLE_ATTRIBUTES="personalTitle"
+
+# Attribute with custom label
+USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title"
+
+# Multiple attributes
+USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,office:Office Location,bio:Biography::textarea"
+
+# Telephone with specific input type
+USER_EDITABLE_ATTRIBUTES="workPhone:Work Phone::tel"
+
+# Multi-valued attribute using suffix
+USER_EDITABLE_ATTRIBUTES="sshPublicKey+"
+
+# File upload using suffix
+USER_EDITABLE_ATTRIBUTES="avatar:Profile Picture^"
+
+# Mix of formats
+USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,bio:Biography::textarea,sshPublicKey+,avatar^"
+```
+
+**Security:**
+
+A **security blacklist** prevents users from editing critical system attributes, regardless of this configuration:
+
+**Blacklisted attributes** (cannot be user-edited):
+- **System identifiers:** `dn`, `uid`, `cn`, `objectClass`
+- **POSIX attributes:** `uidNumber`, `gidNumber`, `homeDirectory`, `loginShell`
+- **Security:** `userPassword`, `sambaNTPassword`, `sambaPassword`
+- **Group membership:** `memberOf`, `member`, `memberUid`, `uniqueMember`
+- **MFA/TOTP:** `totpSecret`, `totpStatus`, `totpEnrolledDate`, `totpScratchCode`
+- **Structural:** `creatorsName`, `createTimestamp`, `modifiersName`, `modifyTimestamp`, `entryDN`, `entryUUID`
+
+Attempts to edit blacklisted attributes will be logged and rejected.
+
+**Example configurations:**
+
+```bash
+# Allow users to edit their biography and office location
+USER_EDITABLE_ATTRIBUTES="bio:Biography::textarea,office:Office Location"
+
+# Add SSH public keys (multi-valued)
+USER_EDITABLE_ATTRIBUTES="sshPublicKey+"
+
+# Extended profile with multiple field types
+USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,office:Office,bio:About Me::textarea,website:Website::url,availableForChat:Available::checkbox"
+
+# For organizations with custom LDAP schema
+USER_EDITABLE_ATTRIBUTES="employeeID:Employee ID,costCenter:Cost Center,projectCode:Current Project"
+```
+
+**Photo Upload Validation:**
+
+The `jpegPhoto` attribute has special validation:
+- **File type:** Must be a valid JPEG image (verified by MIME type and image content)
+- **File size:** Maximum 500KB (to ensure LDAP performance)
+- **Format:** Binary data stored directly in LDAP
+
+Users attempting to upload non-JPEG files or files larger than 500KB will see an error message.
+
+**Access Control:**
+
+The user profile module is available to **all authenticated users** (not just admins). Users can only:
+- View and edit their own profile
+- Modify attributes that pass the security blacklist check
+- Update attributes configured in `USER_EDITABLE_ATTRIBUTES` plus the built-in safe defaults
+
+Administrators can use the Account Manager module for full control over all user attributes.
+
+**System Configuration Page:**
+
+Administrators can view the complete system configuration by navigating to **System Config** from the main menu. This page displays:
+- All configuration values with defaults highlighted
+- LDAP directory settings
+- MFA/TOTP configuration
+- User profile editable attributes (default and admin-configured)
+- Email settings
+- Security and session settings
+- Active debug modes (with warnings)
+
+Values that differ from defaults are highlighted with blue badges, making it easy to see what has been customized.
+
+---
+
 ## Email Settings
 
 Configuration for sending email notifications. See [Advanced Topics](advanced.md#sending-emails) for setup details.
@@ -462,6 +657,8 @@ The domain for auto-generating email addresses when creating accounts.
 **Example:** `example.com`
 
 **Usage:** If set and a user's email address is blank, it will be generated as `username@example.com`.
+
+**Note:** Email addresses are always ASCII-only due to LDAP schema constraints. Usernames are transliterated to ASCII before generating email addresses. See the [Email Address Encoding](#enforce_username_validation) note for details.
 
 ### `EMAIL_FROM_ADDRESS`
 
@@ -626,7 +823,7 @@ echo "my-ldap-password" | docker secret create ldap_admin_pwd -
 docker service create \
   --secret ldap_admin_pwd \
   -e LDAP_ADMIN_BIND_PWD_FILE=/run/secrets/ldap_admin_pwd \
-  wheelybird/ldap-user-manager
+  wheelybird/luminary
 ```
 
 **Any environment variable can use the `_FILE` suffix** to read from a file instead of being set directly.

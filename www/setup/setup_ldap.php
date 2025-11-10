@@ -21,15 +21,18 @@ $show_create_admin_button = FALSE;
 if (isset($_POST['fix_problems'])) {
 ?>
 <script>
-    $(document).ready(function(){
-     $('[data-toggle="popover"]').popover(); 
+    document.addEventListener('DOMContentLoaded', function() {
+      var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+      var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl);
+      });
     });
 </script>
 <div class='container'>
 
- <div class="panel panel-default">
-  <div class="panel-heading">Updating LDAP...</div>
-   <div class="panel-body">
+ <div class="card">
+  <div class="card-header">Updating LDAP...</div>
+   <div class="card-body">
     <ul class="list-group">
 
 <?php
@@ -137,15 +140,15 @@ if (isset($_POST['fix_problems'])) {
  if (count($admins) < 1) {
 
   ?>
-  <div class="form-group">
+  <div class="row mb-3">
   <form action="<?php print "{$SERVER_PATH}account_manager/new_user.php"; ?>" method="post">
   <input type="hidden" name="setup_admin_account">
   <?php
   print "$li_fail The LDAP administration group is empty. ";
-  print "<a href='#' data-toggle='popover' title='LDAP account administrators' data-content='";
+  print "<a href='#' data-bs-toggle='popover' title='LDAP account administrators' data-content='";
   print "Only members of this group ({$LDAP['admins_group']}) will be able to access the account managment section, so we need to add people to it.";
   print "'>What's this?</a>";
-  print "<label class='pull-right'><input type='checkbox' name='setup_admin_account' class='pull-right' checked>Create a new account and add it to the admin group?&nbsp;</label>";
+  print "<label class='float-end'><input type='checkbox' name='setup_admin_account' class='float-end' checked>Create a new account and add it to the admin group?&nbsp;</label>";
   print "</li>\n";
   $show_create_admin_button = TRUE;
  }

@@ -85,24 +85,28 @@ EoT;
      $sent_email = send_email($ACCOUNT_REQUESTS_EMAIL,"$ORGANISATION_NAME account requests",$mail_subject,$mail_body);
      if ($sent_email) { ?>
        <div class="container">
-         <div class="col-sm-6 col-sm-offset-3">
-           <div class="panel panel-success">
-             <div class="panel-heading">Thank you</div>
-             <div class="panel-body">
+         <div class="row justify-content-center">
+           <div class="col-sm-6">
+             <div class="card border-success">
+             <div class="card-header">Thank you</div>
+             <div class="card-body">
                The request was sent and the administrator will process it as soon as possible.
              </div>
+           </div>
            </div>
          </div>
        </div>
      <?php }
      else { ?>
        <div class="container">
-         <div class="col-sm-6 col-sm-offset-3">
-           <div class="panel panel-danger">
-             <div class="panel-heading">Error</div>
-             <div class="panel-body">
+         <div class="row justify-content-center">
+           <div class="col-sm-6">
+             <div class="card border-danger">
+             <div class="card-header">Error</div>
+             <div class="card-body">
                Unfortunately the account request wasn't sent because of a technical issue.
              </div>
+           </div>
            </div>
          </div>
        </div>
@@ -115,67 +119,69 @@ EoT;
 }
 ?>
 <div class="container">
- <div class="col-sm-8 col-sm-offset-2">
+ <div class="row justify-content-center">
+  <div class="col-sm-8">
 
-  <div class="panel panel-default">
-    <div class="panel-body">
+  <div class="card">
+    <div class="card-body">
     Use this form to send a request for an account to an administrator at <?php print $ORGANISATION_NAME; ?>.
     If the administrator approves your request they'll get in touch with you to give you your new credentials.
     </div>
   </div>
 
-  <div class="panel panel-default"> 
-   <div class="panel-heading text-center">Request an account for <?php print $ORGANISATION_NAME; ?></div>
-   <div class="panel-body text-center">
+  <div class="card"> 
+   <div class="card-header text-center">Request an account for <?php print $ORGANISATION_NAME; ?></div>
+   <div class="card-body text-center">
 
    <form class="form-horizontal" action='' method='post'>
 
-    <div class="form-group">
-     <label for="firstname" class="col-sm-4 control-label">First name</label>
+    <div class="row mb-3">
+     <label for="firstname" class="col-sm-4 col-form-label">First name</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="firstname" name="firstname" placeholder="Required" <?php if (isset($firstname)) { print "value='$firstname'"; } ?>>
      </div>
     </div>
 
-    <div class="form-group">
-     <label for="lastname" class="col-sm-4 control-label">Last name</label>
+    <div class="row mb-3">
+     <label for="lastname" class="col-sm-4 col-form-label">Last name</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="lastname" name="lastname" placeholder="Required" <?php if (isset($lastname)) { print "value='$lastname'"; } ?>>
      </div>
     </div>
 
-    <div class="form-group">
-     <label for="email" class="col-sm-4 control-label">Email</label>
+    <div class="row mb-3">
+     <label for="email" class="col-sm-4 col-form-label">Email</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="email" name="email" <?php if (isset($email)) { print "value='$email'"; } ?>>
      </div>
     </div>
 
-    <div class="form-group">
-     <label for="Notes" class="col-sm-4 control-label">Notes</label>
+    <div class="row mb-3">
+     <label for="Notes" class="col-sm-4 col-form-label">Notes</label>
      <div class="col-sm-6">
       <textarea class="form-control" id="notes" name="notes" placeholder="Enter any extra information you think the administrator might need to know."><?php if (isset($notes)) { print $notes; } ?></textarea>
      </div>
     </div>
 
-    <div class="form-group">
-     <label for="validate" class="col-sm-4 control-label">Validation</label>
+    <div class="row mb-3">
+     <label for="validate" class="col-sm-4 col-form-label">Validation</label>
      <div class="col-sm-6">
       <span class="center-block">
         <img src="human.php" class="human-check" alt="Non-human detection">
-        <button type="button" class="btn btn-default btn-sm" onclick="document.querySelector('.human-check').src = 'human.php?' + Date.now()">
-         <span class="glyphicon glyphicon-refresh"></span> Refresh
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.querySelector('.human-check').src = 'human.php?' + Date.now()">
+         <span class="bi bi-arrow-clockwise"></span> Refresh
         </button>
       </span>
       <input type="text" class="form-control center-block" id="validate" name="validate" placeholder="Enter the characters from the image">
      </div>
     </div>
 
-    <div class="form-group">
-     <button type="submit" class="btn btn-default">Send request</button>
+    <div class="row mb-3">
+     <button type="submit" class="btn btn-secondary">Send request</button>
     </div>
    
    </form>
+  </div>
   </div>
  </div>
 </div>

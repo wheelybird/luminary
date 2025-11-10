@@ -17,20 +17,23 @@ $ldap_connection = open_ldap_connection();
 
 ?>
 <script>
-    $(document).ready(function(){
-     $('[data-toggle="popover"]').popover();
+    document.addEventListener('DOMContentLoaded', function() {
+      var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+      var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl);
+      });
     });
 </script>
-<div class="form-group">
+<div class="row mb-3">
   <form action="<?php print $THIS_MODULE_PATH; ?>/setup_ldap.php" method="post">
   <input type="hidden" name="fix_problems">
 
 
     <div class='container'>
 
-     <div class="panel panel-default">
-      <div class="panel-heading">LDAP connection tests</div>
-      <div class="panel-body">
+     <div class="card">
+      <div class="card-header">LDAP connection tests</div>
+      <div class="card-body">
        <ul class="list-group">
 <?php
 
@@ -43,7 +46,7 @@ if ($LDAP['connection_type'] != "plain") {
 }
 else {
  print "$li_warn Unable to connect to {$LDAP['uri']} via StartTLS. ";
- print "<a href='#' data-toggle='popover' title='StartTLS' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='StartTLS' data-content='";
  print "The connection to the LDAP server works, but encrypted communication can&#39;t be enabled.";
  print "'>What's this?</a></li>\n";
 }
@@ -54,9 +57,9 @@ else {
       </div>
      </div>
 
-     <div class="panel panel-default">
-      <div class="panel-heading">LDAP RFC2307BIS schema check</div>
-      <div class="panel-body">
+     <div class="card">
+      <div class="card-header">LDAP RFC2307BIS schema check</div>
+      <div class="card-body">
        <ul class="list-group">
 <?php
 
@@ -70,7 +73,7 @@ if ($bis_detected == TRUE) {
  else {
   print "$li_good The RFC2307BIS schema appears to be available. ";
  }
- print "<a href='#' data-toggle='popover' title='RFC2307BIS schema' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='RFC2307BIS schema' data-content='";
  print "The RFC2307BIS schema enhances posixGroups, allowing you to use \"memberOf\" in LDAP searches.";
  print "'>What's this?</a>";
  print "</li>\n";
@@ -79,7 +82,7 @@ if ($bis_detected == TRUE) {
 else {
 
  print "$li_warn The RFC2307BIS schema doesn't appear to be available.<br>\nIf this is incorrect, set FORCE_RFC2307BIS to TRUE, restart the user manager and run the setup again. ";
- print "<a href='#' data-toggle='popover' title='RFC2307BIS' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='RFC2307BIS' data-content='";
  print "The RFC2307BIS schema enhances posixGroups, allowing for memberOf LDAP searches.";
  print "'>What's this?</a>";
  print "</li>\n";
@@ -92,9 +95,9 @@ else {
       </div>
      </div>
 
-     <div class="panel panel-default">
-      <div class="panel-heading">MFA/TOTP schema check</div>
-      <div class="panel-body">
+     <div class="card">
+      <div class="card-header">MFA/TOTP schema check</div>
+      <div class="card-body">
        <ul class="list-group">
 <?php
 
@@ -146,21 +149,21 @@ if ($MFA_ENABLED == TRUE) {
 
  if ($schema_found && empty($missing_attrs)) {
   print "$li_good MFA is enabled and the TOTP schema (<strong>$totp_objectclass</strong>) with all required attributes is present. ";
-  print "<a href='#' data-toggle='popover' title='MFA/TOTP Schema' data-content='";
+  print "<a href='#' data-bs-toggle='popover' title='MFA/TOTP Schema' data-content='";
   print "The TOTP schema allows users to enrol in multi-factor authentication with time-based one-time passwords stored in LDAP.";
   print "'>What's this?</a></li>\n";
  }
  elseif ($schema_found && !empty($missing_attrs)) {
   print "$li_warn MFA is enabled and the object class <strong>$totp_objectclass</strong> exists, but the following attributes are missing: <strong>" . implode(', ', $missing_attrs) . "</strong>.<br>\n";
   print "MFA will not function until all required attributes are installed. ";
-  print "<a href='#' data-toggle='popover' title='Missing TOTP Attributes' data-content='";
+  print "<a href='#' data-bs-toggle='popover' title='Missing TOTP Attributes' data-content='";
   print "The TOTP object class was found but some required attributes are missing from the schema. Install the complete schema from the ldap-totp-schema repository.";
   print "'>What's this?</a></li>\n";
  }
  else {
   print "$li_warn MFA is enabled but the TOTP schema (<strong>$totp_objectclass</strong>) is not installed in LDAP.<br>\n";
   print "MFA will not function until the schema is installed. See the <a href='https://github.com/wheelybird/ldap-totp-schema' target='_blank'>ldap-totp-schema repository</a> for installation instructions. ";
-  print "<a href='#' data-toggle='popover' title='Missing TOTP Schema' data-content='";
+  print "<a href='#' data-bs-toggle='popover' title='Missing TOTP Schema' data-content='";
   print "Multi-factor authentication requires the TOTP schema to store secrets and configuration in LDAP. Without it, users cannot enrol in MFA.";
   print "'>What's this?</a></li>\n";
  }
@@ -175,9 +178,9 @@ else {
       </div>
      </div>
 
-     <div class="panel panel-default">
-      <div class="panel-heading">LDAP OU checks</div>
-      <div class="panel-body">
+     <div class="card">
+      <div class="card-header">LDAP OU checks</div>
+      <div class="card-body">
        <ul class="list-group">
 <?php
 
@@ -188,10 +191,10 @@ $group_result = ldap_get_entries($ldap_connection, $ldap_group_search);
 if ($group_result['count'] != 1) {
 
  print "$li_fail The group OU (<strong>{$LDAP['group_dn']}</strong>) doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='{$LDAP['group_dn']}' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='{$LDAP['group_dn']}' data-content='";
  print "This is the Organizational Unit (OU) that the groups are stored under.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_group_ou' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_group_ou' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 
@@ -207,10 +210,10 @@ $user_result = ldap_get_entries($ldap_connection, $ldap_user_search);
 if ($user_result['count'] != 1) {
 
  print "$li_fail The user OU (<strong>{$LDAP['user_dn']}</strong>) doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='{$LDAP['user_dn']}' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='{$LDAP['user_dn']}' data-content='";
  print "This is the Organisational Unit (OU) that the user accounts are stored under.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_user_ou' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_user_ou' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 
@@ -224,9 +227,9 @@ else {
       </div>
      </div>
 
-     <div class="panel panel-default">
-      <div class="panel-heading">LDAP group and settings</div>
-      <div class="panel-body">
+     <div class="card">
+      <div class="card-header">LDAP group and settings</div>
+      <div class="card-body">
        <ul class="list-group">
 <?php
 
@@ -237,10 +240,10 @@ $gid_result = ldap_get_entries($ldap_connection, $ldap_gid_search);
 if ($gid_result['count'] != 1) {
 
  print "$li_warn The <strong>lastGID</strong> entry doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='cn=lastGID,{$LDAP['base_dn']}' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='cn=lastGID,{$LDAP['base_dn']}' data-content='";
  print "This is used to store the last group ID used when creating a POSIX group.  Without this the highest current group ID is found and incremented, but this might re-use the GID from a deleted group.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_last_gid' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_last_gid' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 
@@ -257,10 +260,10 @@ $uid_result = ldap_get_entries($ldap_connection, $ldap_uid_search);
 if ($uid_result['count'] != 1) {
 
  print "$li_warn The <strong>lastUID</strong> entry doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='cn=lastUID,{$LDAP['base_dn']}' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='cn=lastUID,{$LDAP['base_dn']}' data-content='";
  print "This is used to store the last user ID used when creating a POSIX account.  Without this the highest current user ID is found and incremented, but this might re-use the UID from a deleted account.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_last_uid' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_last_uid' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 
@@ -277,10 +280,10 @@ $defgroup_result = ldap_get_entries($ldap_connection, $ldap_defgroup_search);
 if ($defgroup_result['count'] != 1) {
 
  print "$li_warn The default group (<strong>$DEFAULT_USER_GROUP</strong>) doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='Default user group' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='Default user group' data-content='";
  print "When we add users we need to assign them a default group ($DEFAULT_USER_GROUP). If this doesn&#39;t exist then a new group will be created to match each user account, which may not be desirable.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_default_group' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_default_group' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 
@@ -297,10 +300,10 @@ $adminsgroup_result = ldap_get_entries($ldap_connection, $ldap_adminsgroup_searc
 if ($adminsgroup_result['count'] != 1) {
 
  print "$li_fail The group defining LDAP account administrators (<strong>{$LDAP['admins_group']}</strong>) doesn't exist. ";
- print "<a href='#' data-toggle='popover' title='LDAP account administrators group' data-content='";
+ print "<a href='#' data-bs-toggle='popover' title='LDAP account administrators group' data-content='";
  print "Only members of this group ({$LDAP['admins_group']}) will be able to access the account managment section, so it&#39;s definitely something you&#39;ll want to create.";
  print "'>What's this?</a>";
- print "<label class='pull-right'><input type='checkbox' name='setup_admins_group' class='pull-right' checked>Create?&nbsp;</label>";
+ print "<label class='float-end'><input type='checkbox' name='setup_admins_group' class='float-end' checked>Create?&nbsp;</label>";
  print "</li>\n";
  $show_finish_button = FALSE;
 

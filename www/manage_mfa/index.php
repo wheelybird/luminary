@@ -138,9 +138,10 @@ render_header("Manage Multi-Factor Authentication");
 ?>
 
 <div class="container">
-  <div class="col-sm-8 col-sm-offset-2">
+  <div class="row justify-content-center">
+    <div class="col-sm-8">
 
-    <?php if (isset($_GET['mfa_required'])) { ?>
+      <?php if (isset($_GET['mfa_required'])) { ?>
       <div class="alert alert-danger">
         <p><strong>Multi-Factor Authentication Required</strong></p>
         <p>Your grace period for setting up MFA has expired. You must configure MFA below to continue using this system.</p>
@@ -162,9 +163,9 @@ render_header("Manage Multi-Factor Authentication");
     <?php } ?>
 
     <?php if (isset($success)) { ?>
-      <div class="panel panel-success">
-        <div class="panel-heading">MFA Enabled Successfully</div>
-        <div class="panel-body">
+      <div class="card border-success">
+        <div class="card-header">MFA Enabled Successfully</div>
+        <div class="card-body">
           <p><strong>Your Multi-Factor Authentication has been enabled.</strong></p>
           <p>Please save these backup codes in a secure location. You can use them to log in if you lose access to your authenticator app.</p>
 
@@ -183,9 +184,9 @@ render_header("Manage Multi-Factor Authentication");
     <?php } ?>
 
     <?php if (isset($success_disable)) { ?>
-      <div class="panel panel-success">
-        <div class="panel-heading">MFA Disabled</div>
-        <div class="panel-body">
+      <div class="card border-success">
+        <div class="card-header">MFA Disabled</div>
+        <div class="card-body">
           <p>Your Multi-Factor Authentication has been disabled.</p>
           <p class="text-center">
             <a href="<?php echo $SERVER_PATH; ?>home" class="btn btn-primary">Return to Home</a>
@@ -195,11 +196,11 @@ render_header("Manage Multi-Factor Authentication");
       <?php render_footer(); exit(0); ?>
     <?php } ?>
 
-    <div class="panel panel-default">
-      <div class="panel-heading">
-        <h3 class="panel-title">Multi-Factor Authentication Status</h3>
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Multi-Factor Authentication Status</h3>
       </div>
-      <div class="panel-body">
+      <div class="card-body">
 
         <table class="table">
           <tr>
@@ -208,16 +209,16 @@ render_header("Manage Multi-Factor Authentication");
               <?php
                 switch ($totp_status) {
                   case 'active':
-                    echo '<span class="label label-success">Active</span>';
+                    echo '<span class="badge bg-success">Active</span>';
                     break;
                   case 'pending':
-                    echo '<span class="label label-warning">Pending Setup</span>';
+                    echo '<span class="badge bg-warning text-dark">Pending Setup</span>';
                     break;
                   case 'disabled':
-                    echo '<span class="label label-default">Disabled</span>';
+                    echo '<span class="badge bg-secondary">Disabled</span>';
                     break;
                   default:
-                    echo '<span class="label label-default">Not Configured</span>';
+                    echo '<span class="badge bg-secondary">Not Configured</span>';
                 }
               ?>
             </td>
@@ -226,7 +227,7 @@ render_header("Manage Multi-Factor Authentication");
           <?php if ($user_requires_mfa) { ?>
             <tr>
               <th>MFA Required:</th>
-              <td><span class="label label-info">Yes</span> (Required by group membership)</td>
+              <td><span class="badge bg-info text-dark">Yes</span> (Required by group membership)</td>
             </tr>
           <?php } ?>
 
@@ -249,10 +250,10 @@ render_header("Manage Multi-Factor Authentication");
               <th>Grace Period:</th>
               <td>
                 <?php if ($grace_period_remaining > 0) { ?>
-                  <span class="label label-warning"><?php echo $grace_period_remaining; ?> days remaining</span>
+                  <span class="badge bg-warning text-dark"><?php echo $grace_period_remaining; ?> days remaining</span>
                   <br><small>You must set up MFA within <?php echo $grace_period_remaining; ?> days to maintain VPN access.</small>
                 <?php } else { ?>
-                  <span class="label label-danger">Expired</span>
+                  <span class="badge bg-danger">Expired</span>
                   <br><small>Your grace period has expired. Please set up MFA to restore VPN access.</small>
                 <?php } ?>
               </td>
@@ -275,9 +276,9 @@ render_header("Manage Multi-Factor Authentication");
 
         <?php } elseif (isset($enrolling)) { ?>
 
-          <div class="panel panel-info">
-            <div class="panel-heading">Enrol in Multi-Factor Authentication</div>
-            <div class="panel-body">
+          <div class="card border-info">
+            <div class="card-header">Enrol in Multi-Factor Authentication</div>
+            <div class="card-body">
 
               <h4>Step 1: Scan QR Code</h4>
               <p>Use your authenticator app (Google Authenticator, Authy, or similar) to scan this QR code:</p>
@@ -308,7 +309,7 @@ render_header("Manage Multi-Factor Authentication");
                 <input type="hidden" name="code2" id="code2-hidden">
                 <input type="hidden" name="time_window1" id="time-window1">
 
-                <div class="form-group" id="code-input-group">
+                <div class="row mb-3" id="code-input-group">
                   <label for="code-input">Verification Code:</label>
                   <input type="text" class="form-control" id="code-input" pattern="[0-9]{6}" maxlength="6" required autofocus autocomplete="off">
                   <small class="form-text text-muted" id="code-help">This is the 6-digit code currently shown in your authenticator app.</small>
@@ -471,6 +472,7 @@ render_header("Manage Multi-Factor Authentication");
       </div>
     </div>
 
+    </div>
   </div>
 </div>
 

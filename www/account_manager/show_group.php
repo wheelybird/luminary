@@ -278,49 +278,89 @@ ldap_close($ldap_connection);
 
  }
 
- $(function () {
+ document.addEventListener('DOMContentLoaded', function() {
 
-    $('body').on('click', '.list-group .list-group-item', function () {
-        $(this).toggleClass('active');
-    });
-    $('.list-arrows button').click(function () {
-        var $button = $(this), actives = '';
-        if ($button.hasClass('move-left')) {
-            actives = $('.list-right ul li.active');
-            actives.clone().appendTo('.list-left ul');
-            $('.list-left ul li.active').removeClass('active');
-            actives.remove();
-        } else if ($button.hasClass('move-right')) {
-            actives = $('.list-left ul li.active');
-            actives.clone().appendTo('.list-right ul');
-            $('.list-right ul li.active').removeClass('active');
-            actives.remove();
-        }
-        if ($("#membership_list").length > 0) {
-          $("#submit_members").prop("disabled", false);
-          $("#submit_attributes").prop("disabled", false);
+    // Click handler for list items to toggle active state
+    document.body.addEventListener('click', function(e) {
+        const listItem = e.target.closest('.list-group .list-group-item');
+        if (listItem) {
+            listItem.classList.toggle('active');
         }
     });
-    $('.dual-list .selector').click(function () {
-        var $checkBox = $(this);
-        if (!$checkBox.hasClass('selected')) {
-            $checkBox.addClass('selected').closest('.well').find('ul li:not(.active)').addClass('active');
-            $checkBox.children('i').removeClass('glyphicon-unchecked').addClass('glyphicon-check');
-        } else {
-            $checkBox.removeClass('selected').closest('.well').find('ul li.active').removeClass('active');
-            $checkBox.children('i').removeClass('glyphicon-check').addClass('glyphicon-unchecked');
-        }
+
+    // Arrow button handlers to move items between lists
+    document.querySelectorAll('.list-arrows button').forEach(function(button) {
+        button.addEventListener('click', function() {
+            if (this.classList.contains('move-left')) {
+                const actives = document.querySelectorAll('.list-right ul li.active');
+                const leftUl = document.querySelector('.list-left ul');
+                actives.forEach(function(item) {
+                    const clone = item.cloneNode(true);
+                    leftUl.appendChild(clone);
+                    clone.classList.remove('active');
+                    item.remove();
+                });
+            } else if (this.classList.contains('move-right')) {
+                const actives = document.querySelectorAll('.list-left ul li.active');
+                const rightUl = document.querySelector('.list-right ul');
+                actives.forEach(function(item) {
+                    const clone = item.cloneNode(true);
+                    rightUl.appendChild(clone);
+                    clone.classList.remove('active');
+                    item.remove();
+                });
+            }
+            if (document.getElementById('membership_list')) {
+                document.getElementById('submit_members').disabled = false;
+                const submitAttributes = document.getElementById('submit_attributes');
+                if (submitAttributes) {
+                    submitAttributes.disabled = false;
+                }
+            }
+        });
     });
-    $('[name="SearchDualList"]').keyup(function (e) {
-        var code = e.keyCode || e.which;
-        if (code == '9') return;
-        if (code == '27') $(this).val(null);
-        var $rows = $(this).closest('.dual-list').find('.list-group li');
-        var val = $.trim($(this).val()).replace(/ +/g, ' ').toLowerCase();
-        $rows.show().filter(function () {
-            var text = $(this).text().replace(/\s+/g, ' ').toLowerCase();
-            return !~text.indexOf(val);
-        }).hide();
+
+    // Select all checkbox handlers
+    document.querySelectorAll('.dual-list .selector').forEach(function(selector) {
+        selector.addEventListener('click', function() {
+            const well = this.closest('.well');
+            const icon = this.querySelector('i');
+            if (!this.classList.contains('selected')) {
+                this.classList.add('selected');
+                well.querySelectorAll('ul li:not(.active)').forEach(function(li) {
+                    li.classList.add('active');
+                });
+                icon.classList.remove('bi-square');
+                icon.classList.add('bi-check-square');
+            } else {
+                this.classList.remove('selected');
+                well.querySelectorAll('ul li.active').forEach(function(li) {
+                    li.classList.remove('active');
+                });
+                icon.classList.remove('bi-check-square');
+                icon.classList.add('bi-square');
+            }
+        });
+    });
+
+    // Search functionality
+    document.querySelectorAll('[name="SearchDualList"]').forEach(function(input) {
+        input.addEventListener('keyup', function(e) {
+            const code = e.keyCode || e.which;
+            if (code == '9') return;
+            if (code == '27') this.value = '';
+            const dualList = this.closest('.dual-list');
+            const rows = dualList.querySelectorAll('.list-group li');
+            const val = this.value.trim().replace(/ +/g, ' ').toLowerCase();
+            rows.forEach(function(row) {
+                const text = row.textContent.replace(/\s+/g, ' ').toLowerCase();
+                if (text.indexOf(val) === -1) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        });
     });
 
  });
@@ -352,20 +392,20 @@ ldap_close($ldap_connection);
 
 <div class="container">
   <div class="col-md-12">
-    <div class="panel-group">
-      <div class="panel panel-default">
+    <div class="accordion">
+      <div class="card">
 
-        <div class="panel-heading clearfix">
-          <h3 class="panel-title pull-left" style="padding-top: 7.5px;"><?php print htmlspecialchars(decode_ldap_value($group_cn), ENT_QUOTES, 'UTF-8'); ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h3>
-          <button class="btn btn-warning pull-right" onclick="show_delete_group_button();" <?php if ($group_cn == $LDAP["admins_group"]) { print "disabled"; } ?>>Delete group</button>
-          <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/groups.php" method="post" enctype="multipart/form-data"><input type="hidden" name="delete_group" value="<?php print $group_cn; ?>"><button class="btn btn-danger pull-right invisible" id="delete_group">Confirm deletion</button></form>
+        <div class="card-header clearfix">
+          <h3 class="float-start" style="padding-top: 7.5px;"><?php print htmlspecialchars(decode_ldap_value($group_cn), ENT_QUOTES, 'UTF-8'); ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h3>
+          <button class="btn btn-warning float-end" onclick="show_delete_group_button();" <?php if ($group_cn == $LDAP["admins_group"]) { print "disabled"; } ?>>Delete group</button>
+          <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/groups.php" method="post" enctype="multipart/form-data"><input type="hidden" name="delete_group" value="<?php print $group_cn; ?>"><button class="btn btn-danger float-end invisible" id="delete_group">Confirm deletion</button></form>
         </div>
 
-        <ul class="list-group">
+        <ul class="list-group list-group-flush">
           <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($full_dn), ENT_QUOTES, 'UTF-8'); ?></li>
         </li>
 
-        <div class="panel-body">
+        <div class="card-body">
           <div class="row">
             <div class="dual-list list-left col-md-5">
               <strong>Members</strong>
@@ -373,13 +413,13 @@ ldap_close($ldap_connection);
                 <div class="row">
                   <div class="col-md-10">
                     <div class="input-group">
-                      <span class="input-group-addon glyphicon glyphicon-search"></span>
+                      <span class="input-group-text"><i class="bi bi-search"></i></span>
                       <input type="text" name="SearchDualList" class="form-control" placeholder="search" />
                     </div>
                   </div>
                   <div class="col-md-2">
                     <div class="btn-group">
-                      <a class="btn btn-default selector" title="select all"><i class="glyphicon glyphicon-unchecked"></i></a>
+                      <a class="btn btn-secondary selector" title="select all"><i class="bi bi-square"></i></a>
                     </div>
                   </div>
                 </div>
@@ -399,11 +439,11 @@ ldap_close($ldap_connection);
               </div>
             </div>
             <div class="list-arrows col-md-1 text-center">
-              <button class="btn btn-default btn-sm move-left">
-                <span class="glyphicon glyphicon-chevron-left"></span>
+              <button class="btn btn-secondary btn-sm move-left">
+                <i class="bi bi-chevron-left"></i>
               </button>
-              <button class="btn btn-default btn-sm move-right">
-                <span class="glyphicon glyphicon-chevron-right"></span>
+              <button class="btn btn-secondary btn-sm move-right">
+                <i class="bi bi-chevron-right"></i>
               </button>
               <form id="group_members" action="<?php print $CURRENT_PAGE; ?>" method="post">
                 <input type="hidden" name="update_members">
@@ -418,13 +458,13 @@ ldap_close($ldap_connection);
                 <div class="row">
                   <div class="col-md-2">
                     <div class="btn-group">
-                      <a class="btn btn-default selector" title="select all"><i class="glyphicon glyphicon-unchecked"></i></a>
+                      <a class="btn btn-secondary selector" title="select all"><i class="bi bi-square"></i></a>
                     </div>
                   </div>
                   <div class="col-md-10">
                     <div class="input-group">
                       <input type="text" name="SearchDualList" class="form-control" placeholder="search" />
-                      <span class="input-group-addon glyphicon glyphicon-search"></span>
+                      <span class="input-group-text"><i class="bi bi-search"></i></span>
                     </div>
                   </div>
                 </div>
@@ -444,11 +484,11 @@ ldap_close($ldap_connection);
 <?php
 
 if (count($attribute_map) > 0) { ?>
-      <div class="panel panel-default">
-        <div class="panel-heading clearfix">
-          <h3 class="panel-title pull-left" style="padding-top: 7.5px;">Group attributes</h3>
+      <div class="card">
+        <div class="card-header clearfix">
+          <h3 class="float-start" style="padding-top: 7.5px;">Group attributes</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
           <div class="col-md-8">
             <?php
               $tabindex=1;
@@ -464,8 +504,8 @@ if (count($attribute_map) > 0) { ?>
               }
             ?>
             <div class="row">
-              <div class="col-md-4 col-md-offset-3">
-                <div class="form-group">
+              <div class="col-md-4 offset-md-3">
+                <div class="row mb-3">
                   <button id="submit_attributes" class="btn btn-info" <?php if (count($group_members)==0) print 'disabled'; ?> type="submit" tabindex="<?php print $tabindex; ?>" onclick="update_form_with_users()">Save</button>
                 </div>
               </div>

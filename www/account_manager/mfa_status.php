@@ -140,48 +140,48 @@ foreach ($people as $username => $attribs) {
   <!-- Statistics Cards -->
   <div class="row" style="margin-bottom: 20px;">
     <div class="col-md-2">
-      <div class="panel panel-default">
-        <div class="panel-body text-center">
+      <div class="card">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['total']; ?></h3>
           <p>Total Users</p>
         </div>
       </div>
     </div>
     <div class="col-md-2">
-      <div class="panel panel-success">
-        <div class="panel-body text-center">
+      <div class="card border-success">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['active']; ?></h3>
           <p>Active</p>
         </div>
       </div>
     </div>
     <div class="col-md-2">
-      <div class="panel panel-warning">
-        <div class="panel-body text-center">
+      <div class="card border-warning">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['pending']; ?></h3>
           <p>Pending</p>
         </div>
       </div>
     </div>
     <div class="col-md-2">
-      <div class="panel panel-default">
-        <div class="panel-body text-center">
+      <div class="card">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['not_configured']; ?></h3>
           <p>Not Configured</p>
         </div>
       </div>
     </div>
     <div class="col-md-2">
-      <div class="panel panel-info">
-        <div class="panel-body text-center">
+      <div class="card border-info">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['required']; ?></h3>
           <p>Required</p>
         </div>
       </div>
     </div>
     <div class="col-md-2">
-      <div class="panel panel-danger">
-        <div class="panel-body text-center">
+      <div class="card border-danger">
+        <div class="card-body text-center">
           <h3><?php echo $mfa_stats['grace_expired']; ?></h3>
           <p>Grace Expired</p>
         </div>
@@ -190,15 +190,15 @@ foreach ($people as $username => $attribs) {
   </div>
 
   <!-- Configuration Summary -->
-  <div class="panel panel-default">
-    <div class="panel-heading">
-      <h4 class="panel-title">MFA Configuration</h4>
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">MFA Configuration</h4>
     </div>
-    <div class="panel-body">
+    <div class="card-body">
       <table class="table table-condensed">
         <tr>
           <th>MFA Enabled:</th>
-          <td><?php echo $MFA_ENABLED ? '<span class="label label-success">Yes</span>' : '<span class="label label-default">No</span>'; ?></td>
+          <td><?php echo $MFA_ENABLED ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; ?></td>
         </tr>
         <?php if ($MFA_ENABLED && !empty($MFA_REQUIRED_GROUPS)) { ?>
           <tr>
@@ -219,11 +219,11 @@ foreach ($people as $username => $attribs) {
   </div>
 
   <!-- User List -->
-  <div class="panel panel-default">
-    <div class="panel-heading">
-      <h4 class="panel-title">User MFA Status</h4>
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">User MFA Status</h4>
     </div>
-    <div class="panel-body">
+    <div class="card-body">
       <input class="form-control" id="search_input" type="text" placeholder="Search users...">
     </div>
     <table class="table table-striped">
@@ -238,11 +238,14 @@ foreach ($people as $username => $attribs) {
       </thead>
       <tbody id="userlist">
         <script>
-          $(document).ready(function(){
-            $("#search_input").on("keyup", function() {
-              var value = $(this).val().toLowerCase();
-              $("#userlist tr").filter(function() {
-                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+          document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('search_input');
+            searchInput.addEventListener('keyup', function() {
+              const value = this.value.toLowerCase();
+              const rows = document.querySelectorAll('#userlist tr');
+              rows.forEach(function(row) {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.indexOf(value) > -1 ? '' : 'none';
               });
             });
           });
@@ -259,25 +262,25 @@ foreach ($people as $username => $attribs) {
                 $status = isset($attribs['mfa_status']) ? $attribs['mfa_status'] : 'none';
                 switch ($status) {
                   case 'active':
-                    echo '<span class="label label-success">Active</span>';
+                    echo '<span class="badge bg-success">Active</span>';
                     break;
                   case 'pending':
-                    echo '<span class="label label-warning">Pending</span>';
+                    echo '<span class="badge bg-warning text-dark">Pending</span>';
                     break;
                   case 'disabled':
-                    echo '<span class="label label-default">Disabled</span>';
+                    echo '<span class="badge bg-secondary">Disabled</span>';
                     break;
                   default:
-                    echo '<span class="label label-default">Not Configured</span>';
+                    echo '<span class="badge bg-secondary">Not Configured</span>';
                 }
               ?>
             </td>
             <td>
               <?php
                 if (isset($attribs['mfa_required']) && $attribs['mfa_required']) {
-                  echo '<span class="label label-info">Yes</span>';
+                  echo '<span class="badge bg-info text-dark">Yes</span>';
                 } else {
-                  echo '<span class="label label-default">No</span>';
+                  echo '<span class="badge bg-secondary">No</span>';
                 }
               ?>
             </td>
@@ -286,11 +289,11 @@ foreach ($people as $username => $attribs) {
                 if (isset($attribs['grace_days_remaining'])) {
                   $days = $attribs['grace_days_remaining'];
                   if ($days > 3) {
-                    echo '<span class="label label-success">' . $days . ' days</span>';
+                    echo '<span class="badge bg-success">' . $days . ' days</span>';
                   } elseif ($days > 0) {
-                    echo '<span class="label label-warning">' . $days . ' days</span>';
+                    echo '<span class="badge bg-warning text-dark">' . $days . ' days</span>';
                   } else {
-                    echo '<span class="label label-danger">Expired</span>';
+                    echo '<span class="badge bg-danger">Expired</span>';
                   }
                 } else {
                   echo '<span class="text-muted">N/A</span>';
@@ -301,7 +304,7 @@ foreach ($people as $username => $attribs) {
               <?php if ($status == 'active') { ?>
                 <form method="POST" style="display: inline;">
                   <input type="hidden" name="username" value="<?php echo htmlspecialchars($username); ?>">
-                  <button type="submit" name="disable_user_mfa" class="btn btn-xs btn-danger"
+                  <button type="submit" name="disable_user_mfa" class="btn btn-sm btn-danger"
                           onclick="return confirm('Disable MFA for <?php echo htmlspecialchars($username); ?>?');">
                     Disable MFA
                   </button>
@@ -311,7 +314,7 @@ foreach ($people as $username => $attribs) {
               <?php if ($status == 'pending' && isset($attribs['grace_days_remaining']) && $attribs['grace_days_remaining'] <= 0) { ?>
                 <form method="POST" style="display: inline;">
                   <input type="hidden" name="username" value="<?php echo htmlspecialchars($username); ?>">
-                  <button type="submit" name="reset_grace_period" class="btn btn-xs btn-warning"
+                  <button type="submit" name="reset_grace_period" class="btn btn-danger btn-sm"
                           onclick="return confirm('Reset grace period for <?php echo htmlspecialchars($username); ?>?');">
                     Reset Grace Period
                   </button>

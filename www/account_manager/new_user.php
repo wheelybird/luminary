@@ -333,33 +333,31 @@ render_js_homedir_generator('uid','homedirectory');
 $tabindex=1;
 
 ?>
-<script src="<?php print $SERVER_PATH; ?>js/zxcvbn.min.js"></script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/zxcvbn-bootstrap-strength-meter.js"></script>
-<script type="text/javascript">
- $(document).ready(function(){
-   $("#StrengthProgressBar").zxcvbnProgressBar({ passwordInput: "#password" });
- });
-</script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/generate_passphrase.js"></script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/wordlist.js"></script>
+<script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
 <script>
 
- function check_passwords_match() {
+ // Initialize password strength meter
+ document.addEventListener('DOMContentLoaded', function() {
+   initPasswordStrength('password');
+ });
 
-   if (document.getElementById('password').value != document.getElementById('confirm').value ) {
-       document.getElementById('password_div').classList.add("has-error");
-       document.getElementById('confirm_div').classList.add("has-error");
+ function check_passwords_match() {
+   const password = document.getElementById('password');
+   const confirm = document.getElementById('confirm');
+
+   if (password.value != confirm.value) {
+       password.classList.add("is-invalid");
+       confirm.classList.add("is-invalid");
    }
    else {
-    document.getElementById('password_div').classList.remove("has-error");
-    document.getElementById('confirm_div').classList.remove("has-error");
+    password.classList.remove("is-invalid");
+    confirm.classList.remove("is-invalid");
    }
   }
 
  function random_password() {
-
   generatePassword(4,'-','password','confirm');
-  $("#StrengthProgressBar").zxcvbnProgressBar({ passwordInput: "#password" });
+  check_email_validity(document.getElementById('mail').value);
  }
 
  function back_to_hidden(passwordField,confirmField) {
@@ -378,11 +376,11 @@ $tabindex=1;
   var check_regex = <?php print $JS_EMAIL_REGEX; ?>
 
   if (! check_regex.test(mail) ) {
-   document.getElementById("mail_div").classList.add("has-error");
+   document.getElementById("mail_div").classList.add("is-invalid");
    <?php if ($EMAIL_SENDING_ENABLED == TRUE) { ?>document.getElementById("send_email_checkbox").disabled = true;<?php } ?>
   }
   else {
-   document.getElementById("mail_div").classList.remove("has-error");
+   document.getElementById("mail_div").classList.remove("is-invalid");
    <?php if ($EMAIL_SENDING_ENABLED == TRUE) { ?>document.getElementById("send_email_checkbox").disabled = false;<?php } ?>
   }
 
@@ -393,11 +391,11 @@ $tabindex=1;
 <?php render_dynamic_field_js(); ?>
 
 <div class="container">
- <div class="col-sm-8 col-md-offset-2">
+ <div class="col-sm-8 offset-md-2">
 
-  <div class="panel panel-default">
-   <div class="panel-heading text-center"><?php print $page_title; ?></div>
-   <div class="panel-body text-center">
+  <div class="card">
+   <div class="card-header text-center"><?php print $page_title; ?></div>
+   <div class="card-body text-center">
 
     <form class="form-horizontal" action="" enctype="multipart/form-data" method="post">
 
@@ -418,33 +416,33 @@ $tabindex=1;
        }
      ?>
 
-     <div class="form-group" id="password_div">
-      <label for="password" class="col-sm-3 control-label">Password</label>
+     <div class="row mb-3" id="password_div">
+      <label for="password" class="col-sm-3 col-form-label">Password</label>
       <div class="col-sm-6">
        <input tabindex="<?php print $tabindex+1; ?>" type="text" class="form-control" id="password" name="password" onkeyup="back_to_hidden('password','confirm');">
       </div>
       <div class="col-sm-1">
-       <input tabindex="<?php print $tabindex+2; ?>" type="button" class="btn btn-sm" id="password_generator" onclick="random_password();" value="Generate password">
+       <input tabindex="<?php print $tabindex+3; ?>" type="button" class="btn btn-primary btn-sm" id="password_generator" onclick="random_password();" value="Generate password">
       </div>
      </div>
 
-     <div class="form-group" id="confirm_div">
-      <label for="confirm" class="col-sm-3 control-label">Confirm</label>
+     <div class="row mb-3" id="confirm_div">
+      <label for="confirm" class="col-sm-3 col-form-label">Confirm</label>
       <div class="col-sm-6">
-       <input tabindex="<?php print $tabindex+3; ?>" type="password" class="form-control" id="confirm" name="password_match" onkeyup="check_passwords_match()">
+       <input tabindex="<?php print $tabindex+2; ?>" type="password" class="form-control" id="confirm" name="password_match" onkeyup="check_passwords_match()">
       </div>
      </div>
 
 <?php  if ($EMAIL_SENDING_ENABLED == TRUE and $admin_setup != TRUE) { ?>
-      <div class="form-group" id="send_email_div">
-       <label for="send_email" class="col-sm-3 control-label"> </label>
+      <div class="row mb-3" id="send_email_div">
+       <label for="send_email" class="col-sm-3 col-form-label"> </label>
        <div class="col-sm-6">
         <input tabindex="<?php print $tabindex+4; ?>" type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" <?php if ($disabled_email_tickbox == TRUE) { print "disabled"; } ?>>  Email these credentials to the user?
        </div>
       </div>
 <?php } ?>
 
-     <div class="form-group">
+     <div class="row mb-3">
        <button tabindex="<?php print $tabindex+5; ?>" type="submit" class="btn btn-warning">Create account</button>
      </div>
 

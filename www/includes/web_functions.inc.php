@@ -259,15 +259,16 @@ function render_header($title="",$menu=TRUE) {
  #Initialise the HTML output for the page.
 
  ?>
+<!DOCTYPE html>
 <HTML>
 <HEAD>
  <TITLE><?php print "$title"; ?></TITLE>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, initial-scale=1">
  <link rel="stylesheet" href="<?php print $SERVER_PATH; ?>bootstrap/css/bootstrap.min.css">
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
  <?php if ($CUSTOM_STYLES) echo '<link rel="stylesheet" href="'.$CUSTOM_STYLES.'">' ?>
- <script src="<?php print $SERVER_PATH; ?>js/jquery-3.6.0.min.js"></script>
- <script src="<?php print $SERVER_PATH; ?>bootstrap/js/bootstrap.min.js"></script>
+ <script src="<?php print $SERVER_PATH; ?>bootstrap/js/bootstrap.bundle.min.js"></script>
 </HEAD>
 <BODY>
 <?php
@@ -280,10 +281,16 @@ function render_header($title="",$menu=TRUE) {
 
   ?>
   <script>
-    window.setTimeout(function() { $(".alert").fadeTo(500, 0).slideUp(500, function(){ $(this).remove(); }); }, 10000);
+    window.setTimeout(function() {
+      const alert = document.querySelector('.alert');
+      if (alert) {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      }
+    }, 10000);
   </script>
-  <div class="alert alert-success">
-    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="TRUE">&times;</span></button>
+  <div class="alert alert-success alert-dismissible fade show">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     <p class="text-center">You've logged in successfully.</p>
   </div>
   <?php
@@ -304,48 +311,50 @@ function render_menu() {
  global $SITE_NAME, $MODULES, $THIS_MODULE, $VALIDATED, $IS_ADMIN, $USER_ID, $SERVER_PATH, $CUSTOM_LOGO;
 
  ?>
-  <nav class="navbar navbar-default">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3">
    <div class="container-fluid">
-   <div class="navbar-header"><?php
-      if ($CUSTOM_LOGO) echo '<span class="navbar-brand"><img src="'.$CUSTOM_LOGO.'" class="logo" alt="logo"></span>'
-     ?><a class="navbar-brand" href="./"><?php print $SITE_NAME ?></a>
-   </div>
-     <ul class="nav navbar-nav">
-     <?php
-     foreach ($MODULES as $module => $access) {
+     <?php if ($CUSTOM_LOGO) echo '<a class="navbar-brand" href="./"><img src="'.$CUSTOM_LOGO.'" class="logo" alt="logo"></a>' ?>
+     <a class="navbar-brand" href="./"><?php print $SITE_NAME ?></a>
+     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+       <span class="navbar-toggler-icon"></span>
+     </button>
+     <div class="collapse navbar-collapse" id="navbarNav">
+       <ul class="navbar-nav me-auto">
+       <?php
+       foreach ($MODULES as $module => $access) {
 
-      // Use custom display name if defined, otherwise convert directory name
-      global $MODULE_NAMES;
-      if (isset($MODULE_NAMES[$module])) {
-        $this_module_name = $MODULE_NAMES[$module];
-      } else {
-        $this_module_name = stripslashes(ucwords(preg_replace('/_/',' ',$module)));
-      }
+        // Use custom display name if defined, otherwise convert directory name
+        global $MODULE_NAMES;
+        if (isset($MODULE_NAMES[$module])) {
+          $this_module_name = $MODULE_NAMES[$module];
+        } else {
+          $this_module_name = stripslashes(ucwords(preg_replace('/_/',' ',$module)));
+        }
 
-      $show_this_module = TRUE;
-      if ($VALIDATED == TRUE) {
-       if ($access == 'hidden_on_login') { $show_this_module = FALSE; }
-       if ($IS_ADMIN == FALSE and $access == 'admin' ){ $show_this_module = FALSE; }
-      }
-      else {
-       if ($access != 'hidden_on_login') { $show_this_module = FALSE; }
-      }
-      #print "<p>$module - access is $access & show is $show_this_module</p>";
-      if ($show_this_module == TRUE ) {
-       if ($module == $THIS_MODULE) {
-        print "<li class='active'>";
+        $show_this_module = TRUE;
+        if ($VALIDATED == TRUE) {
+         if ($access == 'hidden_on_login') { $show_this_module = FALSE; }
+         if ($IS_ADMIN == FALSE and $access == 'admin' ){ $show_this_module = FALSE; }
+        }
+        else {
+         if ($access != 'hidden_on_login') { $show_this_module = FALSE; }
+        }
+        #print "<p>$module - access is $access & show is $show_this_module</p>";
+        if ($show_this_module == TRUE ) {
+         if ($module == $THIS_MODULE) {
+          print "<li class='nav-item'><a class='nav-link active' href='{$SERVER_PATH}{$module}/'>$this_module_name</a></li>\n";
+         }
+         else {
+          print "<li class='nav-item'><a class='nav-link' href='{$SERVER_PATH}{$module}/'>$this_module_name</a></li>\n";
+         }
+        }
        }
-       else {
-        print '<li>';
-       }
-       print "<a href='{$SERVER_PATH}{$module}/'>$this_module_name</a></li>\n";
-      }
-     }
-     ?>
-     </ul>
-     <ul class="nav navbar-nav navbar-right">
-      <li><a style="color:#333"><?php if(isset($USER_ID)) { print $USER_ID; } ?></a></li>
-     </ul>
+       ?>
+       </ul>
+       <ul class="navbar-nav">
+        <li class="nav-item"><span class="nav-link"><?php if(isset($USER_ID)) { print $USER_ID; } ?></span></li>
+       </ul>
+     </div>
    </div>
   </nav>
  <?php
@@ -419,7 +428,8 @@ function set_page_access($level) {
 
 function is_valid_email($email) {
 
- return (!filter_var($email, FILTER_VALIDATE_EMAIL)) ? FALSE : TRUE;
+ // Support internationalised email addresses per RFC 6530-6533
+ return (!filter_var($email, FILTER_VALIDATE_EMAIL, FILTER_FLAG_EMAIL_UNICODE)) ? FALSE : TRUE;
 
 }
 
@@ -428,9 +438,9 @@ function is_valid_email($email) {
 
 function render_js_username_check(){
 
- global $USERNAME_REGEX, $ENFORCE_SAFE_SYSTEM_NAMES;
+ global $USERNAME_REGEX, $ENFORCE_USERNAME_VALIDATION;
 
- if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE) {
+ if ($ENFORCE_USERNAME_VALIDATION == TRUE) {
 
  print <<<EoCheckJS
 <script>
@@ -444,10 +454,12 @@ function render_js_username_check(){
   if (!element) return;
 
   if (! check_regex.test(name) ) {
-   element.classList.add("has-error");
+   element.classList.add("is-invalid");
+   element.classList.remove("is-valid");
   }
   else {
-   element.classList.remove("has-error");
+   element.classList.remove("is-invalid");
+   element.classList.add("is-valid");
   }
 
  }
@@ -460,6 +472,36 @@ EoCheckJS;
   print "<script> function check_entity_name_validity(name,div_id) {} </script>";
  }
 
+}
+
+
+######################################################
+
+function remove_accents($str) {
+  // Handle special multi-character ligatures and letters
+  $replacements = array(
+    'æ' => 'ae', 'Æ' => 'AE',
+    'ø' => 'o',  'Ø' => 'O',
+    'å' => 'a',  'Å' => 'A',
+    'ß' => 'ss',
+    'œ' => 'oe', 'Œ' => 'OE',
+    'đ' => 'd',  'Đ' => 'D',
+    'ð' => 'd',  'Ð' => 'D',
+    'þ' => 'th', 'Þ' => 'TH',
+  );
+  $str = strtr($str, $replacements);
+
+  // Normalize to NFD (decomposed form) and remove combining diacritical marks
+  if (class_exists('Normalizer', false)) {
+    $str = Normalizer::normalize($str, Normalizer::FORM_D);
+    // Remove combining diacritical marks (U+0300 to U+036F)
+    $str = preg_replace('/\p{Mn}/u', '', $str);
+  } else {
+    // Fallback: use iconv if Normalizer is not available
+    $str = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $str);
+  }
+
+  return $str;
 }
 
 
@@ -481,10 +523,12 @@ EoCheckJS;
  *   {first_name}.{last_name}              -> john.smith
  *
  * Note: Automatically removes spaces and hyphens from compound names (Jean-Paul -> jeanpaul)
+ *       ALWAYS removes accents for POSIX compatibility (Hæppy Testør -> haeppy testor)
+ *       This ensures usernames work with home directories, email addresses, and LDAP
  *
  * @param string $fn First name
  * @param string $ln Last name
- * @return string Generated username
+ * @return string Generated username (ASCII-safe for POSIX/LDAP compliance)
  */
 function generate_username($fn,$ln) {
 
@@ -495,11 +539,17 @@ function generate_username($fn,$ln) {
   $fn_clean = str_replace(array(' ', '-'), '', $fn);
   $ln_clean = str_replace(array(' ', '-'), '', $ln);
 
+  // ALWAYS remove accents/diacritics for POSIX/LDAP compatibility
+  // Required for: homeDirectory (RFC 2307 uses IA5String), email addresses, filesystem paths
+  // This matches the JavaScript behavior: .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  $fn_clean = remove_accents($fn_clean);
+  $ln_clean = remove_accents($ln_clean);
+
   $username = $USERNAME_FORMAT;
   $username = str_replace('{first_name}',strtolower($fn_clean), $username);
-  $username = str_replace('{first_name_initial}',strtolower($fn_clean[0]), $username);
+  $username = str_replace('{first_name_initial}',strtolower(mb_substr($fn_clean, 0, 1)), $username);
   $username = str_replace('{last_name}',strtolower($ln_clean), $username);
-  $username = str_replace('{last_name_initial}',strtolower($ln_clean[0]), $username);
+  $username = str_replace('{last_name_initial}',strtolower(mb_substr($ln_clean, 0, 1)), $username);
 
   return $username;
 
@@ -513,10 +563,7 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
  #Parameters are the IDs of the input fields and username name div in the account creation form.
  #The div will be set to warning if the username is invalid.
 
- global $USERNAME_FORMAT, $ENFORCE_SAFE_SYSTEM_NAMES;
-
-  $remove_accents="";
-  if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE) { $remove_accents = ".normalize('NFD').replace(/[\u0300-\u036f]/g, '')"; }
+ global $USERNAME_FORMAT;
 
   print <<<EoRenderJS
 
@@ -532,14 +579,45 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
 
   var first_name = first_name_elem.value;
   var last_name  = last_name_elem.value;
-  var template = '$USERNAME_FORMAT';
 
+  // Don't generate username if both names are empty or whitespace-only
+  if (!first_name.trim() && !last_name.trim()) {
+    return;
+  }
+
+  // Clean names to match PHP backend: remove spaces and hyphens (fixes #186)
+  var first_name_clean = first_name.replace(/[\s-]/g, '');
+  var last_name_clean = last_name.replace(/[\s-]/g, '');
+
+  // ALWAYS remove accents for POSIX/LDAP compatibility (matches PHP remove_accents())
+  // First, handle special multi-character ligatures and letters (must be done before NFD)
+  var replacements = {
+    'æ': 'ae', 'Æ': 'AE',
+    'ø': 'o',  'Ø': 'O',
+    'å': 'a',  'Å': 'A',
+    'ß': 'ss',
+    'œ': 'oe', 'Œ': 'OE',
+    'đ': 'd',  'Đ': 'D',
+    'ð': 'd',  'Ð': 'D',
+    'þ': 'th', 'Þ': 'TH'
+  };
+
+  for (var char in replacements) {
+    first_name_clean = first_name_clean.replace(new RegExp(char, 'g'), replacements[char]);
+    last_name_clean = last_name_clean.replace(new RegExp(char, 'g'), replacements[char]);
+  }
+
+  // Then normalize to NFD and remove combining diacritical marks
+  first_name_clean = first_name_clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  last_name_clean = last_name_clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  var template = '$USERNAME_FORMAT';
   var actual_username = template;
 
-  actual_username = actual_username.replace('{first_name}', first_name.toLowerCase()$remove_accents );
-  actual_username = actual_username.replace('{first_name_initial}', first_name.charAt(0).toLowerCase()$remove_accents );
-  actual_username = actual_username.replace('{last_name}', last_name.toLowerCase()$remove_accents );
-  actual_username = actual_username.replace('{last_name_initial}', last_name.charAt(0).toLowerCase()$remove_accents );
+  actual_username = actual_username.replace('{first_name}', first_name_clean.toLowerCase());
+  actual_username = actual_username.replace('{first_name_initial}', first_name_clean.charAt(0).toLowerCase());
+  actual_username = actual_username.replace('{last_name}', last_name_clean.toLowerCase());
+  actual_username = actual_username.replace('{last_name_initial}', last_name_clean.charAt(0).toLowerCase());
 
   check_entity_name_validity(actual_username,'$username_div_id');
 
@@ -558,9 +636,9 @@ EoRenderJS;
 
 function render_js_cn_generator($firstname_field_id,$lastname_field_id,$cn_field_id,$cn_div_id) {
 
-  global $ENFORCE_SAFE_SYSTEM_NAMES;
+  global $ENFORCE_USERNAME_VALIDATION;
 
-  if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE) {
+  if ($ENFORCE_USERNAME_VALIDATION == TRUE) {
     $gen_js = "first_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') + last_name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')";
   }
   else {
@@ -575,13 +653,24 @@ function render_js_cn_generator($firstname_field_id,$lastname_field_id,$cn_field
  function update_cn() {
 
   if ( auto_cn_update == true ) {
-    var first_name = document.getElementById('$firstname_field_id').value;
-    var last_name  = document.getElementById('$lastname_field_id').value;
+    var first_name_elem = document.getElementById('$firstname_field_id');
+    var last_name_elem = document.getElementById('$lastname_field_id');
+    var cn_elem = document.getElementById('$cn_field_id');
+
+    // Add null checks to prevent errors
+    if (!first_name_elem || !last_name_elem || !cn_elem) return;
+
+    var first_name = first_name_elem.value;
+    var last_name  = last_name_elem.value;
+
+    // Don't generate CN if both names are empty or whitespace-only
+    if (!first_name.trim() && !last_name.trim()) return;
+
     this_cn = $gen_js;
 
     check_entity_name_validity(this_cn,'$cn_div_id');
 
-    document.getElementById('$cn_field_id').value = this_cn;
+    cn_elem.value = this_cn;
   }
 
  }
@@ -606,8 +695,18 @@ function render_js_email_generator($username_field_id,$email_field_id) {
  function update_email() {
 
   if ( auto_email_update == true && "$EMAIL_DOMAIN" != ""  ) {
-    var username = document.getElementById('$username_field_id').value;
-    document.getElementById('$email_field_id').value = username + '@' + "$EMAIL_DOMAIN";
+    var username_elem = document.getElementById('$username_field_id');
+    var email_elem = document.getElementById('$email_field_id');
+
+    // Add null checks to prevent errors
+    if (!username_elem || !email_elem) return;
+
+    var username = username_elem.value;
+
+    // Don't generate email if username is empty or whitespace-only
+    if (!username.trim()) return;
+
+    email_elem.value = username + '@' + "$EMAIL_DOMAIN";
   }
 
  }
@@ -630,8 +729,18 @@ function render_js_homedir_generator($username_field_id,$homedir_field_id) {
  function update_homedir() {
 
   if ( auto_homedir_update == true ) {
-    var username = document.getElementById('$username_field_id').value;
-    document.getElementById('$homedir_field_id').value = "/home/" + username;
+    var username_elem = document.getElementById('$username_field_id');
+    var homedir_elem = document.getElementById('$homedir_field_id');
+
+    // Add null checks to prevent errors
+    if (!username_elem || !homedir_elem) return;
+
+    var username = username_elem.value;
+
+    // Don't generate homedir if username is empty or whitespace-only
+    if (!username.trim()) return;
+
+    homedir_elem.value = "/home/" + username;
   }
 
  }
@@ -669,18 +778,14 @@ function render_dynamic_field_js() {
         input_field.name = attribute_name + '[]';
         input_field.value = value;
 
-    var button_span = document.createElement('span');
-        button_span.className = 'input-group-btn';
-
     var remove_button = document.createElement('button');
         remove_button.type = 'button';
-        remove_button.className = 'btn btn-default';
+        remove_button.className = 'btn btn-secondary';
         remove_button.onclick = function() { var div_to_remove = document.getElementById(input_div_id); div_to_remove.innerHTML = ""; }
         remove_button.innerHTML = '-';
 
     input_div.appendChild(input_field);
-    input_div.appendChild(button_span);
-    button_span.appendChild(remove_button);
+    input_div.appendChild(remove_button);
 
   }
 
@@ -698,14 +803,14 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
 
   ?>
 
-     <div class="form-group" id="<?php print $attribute; ?>_div">
+     <div class="row mb-3" id="<?php print $attribute; ?>_div">
 
-       <label for="<?php print $attribute; ?>" class="col-sm-3 control-label"><?php print $label; ?></label>
+       <label for="<?php print $attribute; ?>" class="col-sm-3 col-form-label"><?php print $label; ?></label>
        <div class="col-sm-6" id="<?php print $attribute; ?>_input_div">
        <?php if($inputtype == "multipleinput") {
              ?><div class="input-group">
                   <input type="text" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>[]" value="<?php if (isset($values_r[0])) { print htmlspecialchars(decode_ldap_value($values_r[0]), ENT_QUOTES, 'UTF-8'); } ?>">
-                  <div class="input-group-btn"><button type="button" class="btn btn-default" onclick="add_field_to('<?php print $attribute; ?>')">+</i></button></div>
+                  <button type="button" class="btn btn-secondary" onclick="add_field_to('<?php print $attribute; ?>')">+</button>
               </div>
             <?php
                if (isset($values_r['count']) and $values_r['count'] > 0) {
@@ -744,11 +849,39 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
                }
                else {
                ?>
-                 <button type="button" <?php print $file_button_action; ?> class="btn btn-default" id="<?php print $attribute; ?>-file-info"><?php print $description; ?></button>
+                 <button type="button" <?php print $file_button_action; ?> class="btn btn-secondary" id="<?php print $attribute; ?>-file-info"><?php print $description; ?></button>
                <?php } ?>
-               <label class="btn btn-default">
-                 <?php print $button_text; ?><input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="file" style="display:none" onchange="$('#<?php print $attribute; ?>-file-info').text(this.files[0].name)" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>">
+               <label class="btn btn-secondary">
+                 <?php print $button_text; ?><input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="file" style="display:none" onchange="document.getElementById('<?php print $attribute; ?>-file-info').textContent=this.files[0].name" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>">
                </label>
+            <?php
+            }
+            elseif ($inputtype == "textarea") { ?>
+              <textarea <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" rows="4" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>><?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?></textarea>
+            <?php
+            }
+            elseif ($inputtype == "tel") { ?>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="tel" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+            <?php
+            }
+            elseif ($inputtype == "email") { ?>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="email" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+            <?php
+            }
+            elseif ($inputtype == "url") { ?>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="url" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" placeholder="https://" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+            <?php
+            }
+            elseif ($inputtype == "checkbox") {
+              // For boolean attributes - treats any non-empty value as TRUE
+              $is_checked = (isset($values_r[0]) && $values_r[0] != '' && strcasecmp($values_r[0], 'FALSE') != 0);
+              ?>
+              <div class="form-check">
+                <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="checkbox" class="form-check-input" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="TRUE" <?php if ($is_checked) { print 'checked'; } ?> <?php if ($onkeyup != "") { print "onchange=\"$onkeyup\""; } ?>>
+                <label class="form-check-label" for="<?php print $attribute; ?>">
+                  Enable
+                </label>
+              </div>
             <?php
             }
             else { ?>
@@ -777,9 +910,17 @@ function human_readable_filesize($bytes) {
 function render_alert_banner($message,$alert_class="success",$timeout=4000) {
 
 ?>
-    <script>window.setTimeout(function() {$(".alert").fadeTo(500, 0).slideUp(500, function(){ $(this).remove(); }); }, $<?php print $timeout; ?>);</script>
-    <div class="alert alert-<?php print $alert_class; ?>" role="alert">
-     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="TRUE">&times;</span></button>
+    <script>
+      window.setTimeout(function() {
+        const alert = document.querySelector('.alert');
+        if (alert) {
+          const bsAlert = new bootstrap.Alert(alert);
+          bsAlert.close();
+        }
+      }, <?php print $timeout; ?>);
+    </script>
+    <div class="alert alert-<?php print $alert_class; ?> alert-dismissible fade show" role="alert">
+     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
      <p class="text-center"><?php print $message; ?></p>
     </div>
 <?php

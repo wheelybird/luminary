@@ -108,11 +108,12 @@ else {
 
  ?>
 <div class="container">
- <div class="col-sm-8 col-sm-offset-2">
+ <div class="row justify-content-center">
+  <div class="col-sm-8">
 
-  <div class="panel panel-default">
-   <div class="panel-heading text-center">Log in</div>
-   <div class="panel-body text-center">
+   <div class="card">
+   <div class="card-header text-center">Log in</div>
+   <div class="card-body text-center">
 
    <?php if (isset($display_unauth)) { ?>
    <div class="alert alert-warning">
@@ -135,25 +136,26 @@ else {
    <form class="form-horizontal" action='' method='post'>
     <?php if (isset($redirect_to) and ($redirect_to != "")) { ?><input type="hidden" name="redirect_to" value="<?php print htmlspecialchars($redirect_to); ?>"><?php } ?>
 
-    <div class="form-group">
-     <label for="username" class="col-sm-4 control-label"><?php print $SITE_LOGIN_FIELD_LABEL; ?></label>
+    <div class="row mb-3">
+     <label for="username" class="col-sm-4 col-form-label"><?php print $SITE_LOGIN_FIELD_LABEL; ?></label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="user_id" name="user_id">
      </div>
     </div>
 
-    <div class="form-group">
-     <label for="password" class="col-sm-4 control-label">Password</label>
+    <div class="row mb-3">
+     <label for="password" class="col-sm-4 col-form-label">Password</label>
      <div class="col-sm-6">
       <input type="password" class="form-control" id="confirm" name="password">
      </div>
     </div>
 
-    <div class="form-group">
-     <button type="submit" class="btn btn-default">Log in</button>
+    <div class="row mb-3">
+     <button type="submit" class="btn btn-secondary">Log in</button>
     </div>
 
    </form>
+   </div>
   </div>
  </div>
 </div>

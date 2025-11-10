@@ -295,7 +295,8 @@ function ldap_hashed_password($password) {
 
  }
 
- error_log("$log_prefix password update - algo $hash_algo | pwd $hashed_pwd",0);
+ // Log only the algorithm used, never log passwords (even hashed)
+ error_log("$log_prefix LDAP password: using '$hash_algo' as the hashing method",0);
 
  return $hashed_pwd;
 
@@ -807,6 +808,16 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
 
         if (isset($kv[2]) and $kv[2] != "") {
           $this_r['default'] = trim($kv[2]);
+        }
+
+        // Support optional 4th parameter for input type (textarea, tel, checkbox, email, url)
+        if (isset($kv[3]) and $kv[3] != "") {
+          $inputtype = strtolower(trim($kv[3]));
+          // Validate input type
+          $valid_types = array('textarea', 'tel', 'checkbox', 'email', 'url', 'multipleinput', 'binary');
+          if (in_array($inputtype, $valid_types)) {
+            $this_r['inputtype'] = $inputtype;
+          }
         }
 
         $to_merge[$attr_name] = $this_r;

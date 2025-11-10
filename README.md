@@ -53,7 +53,6 @@ docker run \
   -e LDAP_URI="ldap://openldap:389" \
   -e LDAP_BASE_DN="dc=example,dc=com" \
   -e LDAP_REQUIRE_STARTTLS="TRUE" \
-  -e LDAP_ADMINS_GROUP="admins" \
   -e LDAP_ADMIN_BIND_DN="cn=admin,dc=example,dc=com" \
   -e LDAP_ADMIN_BIND_PWD="admin_password" \
   -e LDAP_IGNORE_CERT_ERRORS="true" \
@@ -91,7 +90,8 @@ The following environment variables are required:
 - `LDAP_BASE_DN` - Base DN for your organisation (e.g., `dc=example,dc=com`)
 - `LDAP_ADMIN_BIND_DN` - DN of the admin user (e.g., `cn=admin,dc=example,dc=com`)
 - `LDAP_ADMIN_BIND_PWD` - Password for the admin user
-- `LDAP_ADMINS_GROUP` - Group name for user manager admins (e.g., `admins`)
+
+All other settings have sensible defaults. For example, the admin group defaults to `admins` and can be changed with `LDAP_ADMINS_GROUP`.
 
 ### Using Secrets
 

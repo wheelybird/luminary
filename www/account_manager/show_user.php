@@ -310,41 +310,36 @@ if ($ldap_search) {
 
 
 ?>
-<script src="<?php print $SERVER_PATH; ?>js/zxcvbn.min.js"></script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/zxcvbn-bootstrap-strength-meter.js"></script>
-<script type="text/javascript">
- $(document).ready(function(){
-   $("#StrengthProgressBar").zxcvbnProgressBar({ passwordInput: "#password" });
- });
-</script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/generate_passphrase.js"></script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/wordlist.js"></script>
+<script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
 <script>
 
+ // Initialize password strength meter
+ document.addEventListener('DOMContentLoaded', function() {
+   initPasswordStrength('password');
+ });
+
  function show_delete_user_button() {
-
-  group_del_submit = document.getElementById('delete_user');
+  const group_del_submit = document.getElementById('delete_user');
   group_del_submit.classList.replace('invisible','visible');
-
-
  }
 
  function check_passwords_match() {
+   const password = document.getElementById('password');
+   const confirm = document.getElementById('confirm');
 
-   if (document.getElementById('password').value != document.getElementById('confirm').value ) {
-       document.getElementById('password_div').classList.add("has-error");
-       document.getElementById('confirm_div').classList.add("has-error");
+   if (password.value != confirm.value) {
+       password.classList.add("is-invalid");
+       confirm.classList.add("is-invalid");
    }
    else {
-    document.getElementById('password_div').classList.remove("has-error");
-    document.getElementById('confirm_div').classList.remove("has-error");
+    password.classList.remove("is-invalid");
+    confirm.classList.remove("is-invalid");
    }
   }
 
  function random_password() {
-
   generatePassword(4,'-','password','confirm');
-  $("#StrengthProgressBar").zxcvbnProgressBar({ passwordInput: "#password" });
+  check_if_we_should_enable_sending_email();
  }
 
  function back_to_hidden(passwordField,confirmField) {
@@ -374,46 +369,83 @@ if ($ldap_search) {
 
  }
 
- $(function () {
+ document.addEventListener('DOMContentLoaded', function() {
 
-    $('body').on('click', '.list-group .list-group-item', function () {
-        $(this).toggleClass('active');
-    });
-    $('.list-arrows button').click(function () {
-        var $button = $(this), actives = '';
-        if ($button.hasClass('move-left')) {
-            actives = $('.list-right ul li.active');
-            actives.clone().appendTo('.list-left ul');
-            $('.list-left ul li.active').removeClass('active');
-            actives.remove();
-        } else if ($button.hasClass('move-right')) {
-            actives = $('.list-left ul li.active');
-            actives.clone().appendTo('.list-right ul');
-            $('.list-right ul li.active').removeClass('active');
-            actives.remove();
-        }
-        $("#submit_members").prop("disabled", false);
-    });
-    $('.dual-list .selector').click(function () {
-        var $checkBox = $(this);
-        if (!$checkBox.hasClass('selected')) {
-            $checkBox.addClass('selected').closest('.well').find('ul li:not(.active)').addClass('active');
-            $checkBox.children('i').removeClass('glyphicon-unchecked').addClass('glyphicon-check');
-        } else {
-            $checkBox.removeClass('selected').closest('.well').find('ul li.active').removeClass('active');
-            $checkBox.children('i').removeClass('glyphicon-check').addClass('glyphicon-unchecked');
+    // Click handler for list items to toggle active state
+    document.body.addEventListener('click', function(e) {
+        const listItem = e.target.closest('.list-group .list-group-item');
+        if (listItem) {
+            listItem.classList.toggle('active');
         }
     });
-    $('[name="SearchDualList"]').keyup(function (e) {
-        var code = e.keyCode || e.which;
-        if (code == '9') return;
-        if (code == '27') $(this).val(null);
-        var $rows = $(this).closest('.dual-list').find('.list-group li');
-        var val = $.trim($(this).val()).replace(/ +/g, ' ').toLowerCase();
-        $rows.show().filter(function () {
-            var text = $(this).text().replace(/\s+/g, ' ').toLowerCase();
-            return !~text.indexOf(val);
-        }).hide();
+
+    // Arrow button handlers to move items between lists
+    document.querySelectorAll('.list-arrows button').forEach(function(button) {
+        button.addEventListener('click', function() {
+            if (this.classList.contains('move-left')) {
+                const actives = document.querySelectorAll('.list-right ul li.active');
+                const leftUl = document.querySelector('.list-left ul');
+                actives.forEach(function(item) {
+                    const clone = item.cloneNode(true);
+                    leftUl.appendChild(clone);
+                    clone.classList.remove('active');
+                    item.remove();
+                });
+            } else if (this.classList.contains('move-right')) {
+                const actives = document.querySelectorAll('.list-left ul li.active');
+                const rightUl = document.querySelector('.list-right ul');
+                actives.forEach(function(item) {
+                    const clone = item.cloneNode(true);
+                    rightUl.appendChild(clone);
+                    clone.classList.remove('active');
+                    item.remove();
+                });
+            }
+            document.getElementById('submit_members').disabled = false;
+        });
+    });
+
+    // Select all checkbox handlers
+    document.querySelectorAll('.dual-list .selector').forEach(function(selector) {
+        selector.addEventListener('click', function() {
+            const well = this.closest('.well');
+            const icon = this.querySelector('i');
+            if (!this.classList.contains('selected')) {
+                this.classList.add('selected');
+                well.querySelectorAll('ul li:not(.active)').forEach(function(li) {
+                    li.classList.add('active');
+                });
+                icon.classList.remove('bi-square');
+                icon.classList.add('bi-check-square');
+            } else {
+                this.classList.remove('selected');
+                well.querySelectorAll('ul li.active').forEach(function(li) {
+                    li.classList.remove('active');
+                });
+                icon.classList.remove('bi-check-square');
+                icon.classList.add('bi-square');
+            }
+        });
+    });
+
+    // Search functionality
+    document.querySelectorAll('[name="SearchDualList"]').forEach(function(input) {
+        input.addEventListener('keyup', function(e) {
+            const code = e.keyCode || e.which;
+            if (code == '9') return;
+            if (code == '27') this.value = '';
+            const dualList = this.closest('.dual-list');
+            const rows = dualList.querySelectorAll('.list-group li');
+            const val = this.value.trim().replace(/ +/g, ' ').toLowerCase();
+            rows.forEach(function(row) {
+                const text = row.textContent.replace(/\s+/g, ' ').toLowerCase();
+                if (text.indexOf(val) === -1) {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            });
+        });
     });
 
  });
@@ -438,10 +470,12 @@ if ($ldap_search) {
 
   <?php } ?>
   if (check_regex.test(document.getElementById('mail').value)) {
-   document.getElementById("mail_div").classList.remove("has-error");
+   document.getElementById("mail").classList.remove("is-invalid");
+   document.getElementById("mail").classList.add("is-valid");
   }
   else {
-   document.getElementById("mail_div").classList.add("has-error");
+   document.getElementById("mail").classList.add("is-invalid");
+   document.getElementById("mail").classList.remove("is-valid");
   }
 
  }
@@ -475,18 +509,18 @@ if ($ldap_search) {
 
 
 <div class="container">
- <div class="col-sm-8 col-md-offset-2">
+ <div class="col-sm-8 offset-md-2">
 
-  <div class="panel panel-default">
-    <div class="panel-heading clearfix">
-     <span class="panel-title pull-left"><h3><?php print htmlspecialchars(decode_ldap_value($account_identifier), ENT_QUOTES, 'UTF-8'); ?></h3></span>
-     <button class="btn btn-warning pull-right align-self-end" style="margin-top: auto;" onclick="show_delete_user_button();" <?php if ($account_identifier == $USER_ID) { print "disabled"; }?>>Delete account</button>
-     <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/index.php" method="post"><input type="hidden" name="delete_user" value="<?php print urlencode($account_identifier); ?>"><button class="btn btn-danger pull-right invisible" id="delete_user">Confirm deletion</button></form>
+  <div class="card">
+    <div class="card-header clearfix">
+     <span class="float-start"><h3><?php print htmlspecialchars(decode_ldap_value($account_identifier), ENT_QUOTES, 'UTF-8'); ?></h3></span>
+     <button class="btn btn-warning float-end align-self-end" style="margin-top: auto;" onclick="show_delete_user_button();" <?php if ($account_identifier == $USER_ID) { print "disabled"; }?>>Delete account</button>
+     <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/index.php" method="post"><input type="hidden" name="delete_user" value="<?php print urlencode($account_identifier); ?>"><button class="btn btn-danger float-end invisible" id="delete_user">Confirm deletion</button></form>
     </div>
-    <ul class="list-group">
+    <ul class="list-group list-group-flush">
       <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($dn), ENT_QUOTES, 'UTF-8'); ?></li>
     </li>
-    <div class="panel-body">
+    <div class="card-body">
      <form class="form-horizontal" action="" enctype="multipart/form-data" method="post">
 
       <input type="hidden" name="update_account">
@@ -504,8 +538,8 @@ if ($ldap_search) {
         }
       ?>
 
-      <div class="form-group" id="password_div">
-       <label for="password" class="col-sm-3 control-label">Password</label>
+      <div class="row mb-3" id="password_div">
+       <label for="password" class="col-sm-3 col-form-label">Password</label>
        <div class="col-sm-6">
         <input type="password" class="form-control" id="password" name="password" onkeyup="back_to_hidden('password','confirm'); check_if_we_should_enable_sending_email();">
        </div>
@@ -514,16 +548,16 @@ if ($ldap_search) {
        </div>
       </div>
 
-      <div class="form-group" id="confirm_div">
-       <label for="confirm" class="col-sm-3 control-label">Confirm</label>
+      <div class="row mb-3" id="confirm_div">
+       <label for="confirm" class="col-sm-3 col-form-label">Confirm</label>
        <div class="col-sm-6">
         <input type="password" class="form-control" id="confirm" name="password_match" onkeyup="check_passwords_match()">
        </div>
       </div>
 
 <?php if ($can_send_email == TRUE) { ?>
-      <div class="form-group" id="send_email_div">
-        <label for="send_email" class="col-sm-3 control-label"> </label>
+      <div class="row mb-3" id="send_email_div">
+        <label for="send_email" class="col-sm-3 col-form-label"> </label>
         <div class="col-sm-6">
           <input type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" disabled>  Email the updated credentials to the user?
         </div>
@@ -531,8 +565,8 @@ if ($ldap_search) {
 <?php } ?>
 
 
-      <div class="form-group">
-        <p align='center'><button type="submit" class="btn btn-default">Update account details</button></p>
+      <div class="row mb-3">
+        <p align='center'><button type="submit" class="btn btn-secondary">Update account details</button></p>
       </div>
 
     </form>
@@ -556,12 +590,12 @@ if ($ldap_search) {
   $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
 ?>
 <div class="container">
- <div class="col-sm-8 col-md-offset-2">
-  <div class="panel panel-default">
-   <div class="panel-heading clearfix">
-    <h3 class="panel-title pull-left" style="padding-top: 7.5px;">Multi-Factor Authentication</h3>
+ <div class="col-sm-8 offset-md-2">
+  <div class="card">
+   <div class="card-header clearfix">
+    <h3 class="float-start" style="padding-top: 7.5px;">Multi-Factor Authentication</h3>
    </div>
-   <div class="panel-body">
+   <div class="card-body">
     <table class="table table-condensed">
       <tr>
         <th width="30%">MFA Status:</th>
@@ -569,16 +603,16 @@ if ($ldap_search) {
           <?php
             switch ($user_totp_status) {
               case 'active':
-                echo '<span class="label label-success">Active</span>';
+                echo '<span class="badge bg-success">Active</span>';
                 break;
               case 'pending':
-                echo '<span class="label label-warning">Pending Setup</span>';
+                echo '<span class="badge bg-warning text-dark">Pending Setup</span>';
                 break;
               case 'disabled':
-                echo '<span class="label label-default">Disabled</span>';
+                echo '<span class="badge bg-secondary">Disabled</span>';
                 break;
               default:
-                echo '<span class="label label-default">Not Configured</span>';
+                echo '<span class="badge bg-secondary">Not Configured</span>';
             }
           ?>
         </td>
@@ -586,14 +620,14 @@ if ($ldap_search) {
       <?php if ($user_requires_mfa) { ?>
       <tr>
         <th>MFA Required:</th>
-        <td><span class="label label-info">Yes</span> (Required by group membership)</td>
+        <td><span class="badge bg-info text-dark">Yes</span> (Required by group membership)</td>
       </tr>
       <?php } ?>
       <?php if ($user_totp_status == 'active' && $user_backup_code_count > 0) { ?>
       <tr>
         <th>Backup Codes:</th>
         <td>
-          <span class="label <?php echo $user_backup_code_count < 3 ? 'label-warning' : 'label-info'; ?>">
+          <span class="badge <?php echo $user_backup_code_count < 3 ? 'bg-warning text-dark' : 'bg-info text-dark'; ?>">
             <?php echo $user_backup_code_count; ?> remaining
           </span>
           <?php if ($user_backup_code_count < 3) { ?>
@@ -629,11 +663,11 @@ if ($ldap_search) {
 <div class="container">
  <div class="col-sm-12">
 
-  <div class="panel panel-default">
-   <div class="panel-heading clearfix">
-    <h3 class="panel-title pull-left" style="padding-top: 7.5px;">Group membership</h3>
+  <div class="card">
+   <div class="card-header clearfix">
+    <h3 class="float-start" style="padding-top: 7.5px;">Group membership</h3>
    </div>
-   <div class="panel-body">
+   <div class="card-body">
 
     <div class="row">
 
@@ -643,13 +677,13 @@ if ($ldap_search) {
            <div class="row">
             <div class="col-md-10">
              <div class="input-group">
-              <span class="input-group-addon glyphicon glyphicon-search"></span>
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
               <input type="text" name="SearchDualList" class="form-control" placeholder="search" />
              </div>
             </div>
             <div class="col-md-2">
              <div class="btn-group">
-              <a class="btn btn-default selector" title="select all"><i class="glyphicon glyphicon-unchecked"></i></a>
+              <a class="btn btn-secondary selector" title="select all"><i class="bi bi-square"></i></a>
              </div>
             </div>
            </div>
@@ -670,11 +704,11 @@ if ($ldap_search) {
          </div>
 
          <div class="list-arrows col-md-1 text-center">
-          <button class="btn btn-default btn-sm move-left">
-           <span class="glyphicon glyphicon-chevron-left"></span>
+          <button class="btn btn-secondary btn-sm move-left">
+           <i class="bi bi-chevron-left"></i>
           </button>
-          <button class="btn btn-default btn-sm move-right">
-           <span class="glyphicon glyphicon-chevron-right"></span>
+          <button class="btn btn-secondary btn-sm move-right">
+           <i class="bi bi-chevron-right"></i>
           </button>
           <form id="update_with_groups" action="<?php print $CURRENT_PAGE ?>" method="post">
            <input type="hidden" name="update_member_of">
@@ -689,13 +723,13 @@ if ($ldap_search) {
            <div class="row">
             <div class="col-md-2">
              <div class="btn-group">
-              <a class="btn btn-default selector" title="select all"><i class="glyphicon glyphicon-unchecked"></i></a>
+              <a class="btn btn-secondary selector" title="select all"><i class="bi bi-square"></i></a>
              </div>
             </div>
             <div class="col-md-10">
              <div class="input-group">
               <input type="text" name="SearchDualList" class="form-control" placeholder="search" />
-              <span class="input-group-addon glyphicon glyphicon-search"></span>
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
              </div>
             </div>
            </div>

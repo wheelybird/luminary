@@ -22,12 +22,14 @@ if (isset($_POST['change_password'])) {
   render_header("$ORGANISATION_NAME account manager - password changed");
   ?>
   <div class="container">
-    <div class="col-sm-6 col-sm-offset-3">
-      <div class="panel panel-success">
-        <div class="panel-heading">Success</div>
-        <div class="panel-body">
+    <div class="row justify-content-center">
+      <div class="col-sm-6">
+        <div class="card border-success">
+        <div class="card-header">Success</div>
+        <div class="card-body">
           Your password has been updated.
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -60,30 +62,35 @@ if (isset($mismatched)) {  ?>
 
 ?>
 
-<script src="<?php print $SERVER_PATH; ?>js/zxcvbn.min.js"></script>
-<script type="text/javascript" src="<?php print $SERVER_PATH; ?>js/zxcvbn-bootstrap-strength-meter.js"></script>
-<script type="text/javascript">$(document).ready(function(){	$("#StrengthProgressBar").zxcvbnProgressBar({ passwordInput: "#password" });});</script>
+<script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
+<script>
+ // Initialize password strength meter
+ document.addEventListener('DOMContentLoaded', function() {
+   initPasswordStrength('password');
+ });
+</script>
 
 <div class="container">
- <div class="col-sm-6 col-sm-offset-3">
+ <div class="row justify-content-center">
+  <div class="col-sm-6">
 
-  <div class="panel panel-default">
-   <div class="panel-heading text-center">Change your password</div>
+   <div class="card">
+   <div class="card-header text-center">Change your password</div>
 
    <ul class="list-group">
     <li class="list-group-item">Use this form to change your <?php print $ORGANISATION_NAME; ?> password.  When you start typing your new password the gauge at the bottom will show its security strength.
     Enter your password again in the <b>confirm</b> field.  If the passwords don't match then both fields will be bordered with red.</li>
    </ul>
 
-   <div class="panel-body text-center">
+   <div class="card-body text-center">
    
     <form class="form-horizontal" action='' method='post'>
 
      <input type='hidden' id="change_password" name="change_password">
      <input type='hidden' id="pass_score" value="0" name="pass_score">
      
-     <div class="form-group" id="password_div">
-      <label for="password" class="col-sm-4 control-label">Password</label>
+     <div class="row mb-3" id="password_div">
+      <label for="password" class="col-sm-4 col-form-label">Password</label>
       <div class="col-sm-6">
        <input type="password" class="form-control" id="password" name="password">
       </div>
@@ -91,27 +98,29 @@ if (isset($mismatched)) {  ?>
 
      <script>
       function check_passwords_match() {
+        const password = document.getElementById('password');
+        const confirm = document.getElementById('confirm');
 
-        if (document.getElementById('password').value != document.getElementById('confirm').value ) {
-            document.getElementById('password_div').classList.add("has-error");
-            document.getElementById('confirm_div').classList.add("has-error");
+        if (password.value != confirm.value) {
+            password.classList.add("is-invalid");
+            confirm.classList.add("is-invalid");
         }
         else {
-         document.getElementById('password_div').classList.remove("has-error");
-         document.getElementById('confirm_div').classList.remove("has-error");
+         password.classList.remove("is-invalid");
+         confirm.classList.remove("is-invalid");
         }
        }
      </script>
 
-     <div class="form-group" id="confirm_div">
-      <label for="password" class="col-sm-4 control-label">Confirm</label>
+     <div class="row mb-3" id="confirm_div">
+      <label for="password" class="col-sm-4 col-form-label">Confirm</label>
       <div class="col-sm-6">
        <input type="password" class="form-control" id="confirm" name="password_match" onkeyup="check_passwords_match()">
       </div>
      </div>
 
-     <div class="form-group">
-       <button type="submit" class="btn btn-default">Change password</button>
+     <div class="row mb-3">
+       <button type="submit" class="btn btn-secondary">Change password</button>
      </div>
      
     </form>
@@ -123,6 +132,7 @@ if (isset($mismatched)) {  ?>
    </div>
   </div>
 
+  </div>
  </div>
 </div>
 <?php
