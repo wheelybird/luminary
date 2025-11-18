@@ -4,6 +4,8 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
 include_once "module_functions.inc.php";
 set_page_access("admin");
 
@@ -174,11 +176,15 @@ if (isset($_POST["update_members"])) {
     $initial_member = array_shift($members_to_add);
     $group_add = ldap_new_group($ldap_connection,$group_cn,$initial_member,$to_update);
     if (!$group_add) {
+      // Audit log failed group creation
+      audit_log('group_create_failure', $group_cn, "Failed to create group", 'failure', $USER_ID);
       render_alert_banner("There was a problem creating the group.  See the logs for more information.","danger",10000);
       $group_exists = FALSE;
       $new_group = TRUE;
     }
     else {
+      // Audit log group creation
+      audit_log('group_created', $group_cn, "Group created with initial member: {$initial_member}", 'success', $USER_ID);
       $group_exists = TRUE;
       $new_group = FALSE;
     }
@@ -198,20 +204,32 @@ if (isset($_POST["update_members"])) {
       $updated_attr = ldap_update_group_attributes($ldap_connection,$group_cn,$to_update);
 
       if ($updated_attr) {
+        // Audit log group attribute update
+        $update_fields = array_keys($to_update);
+        $update_details = "Updated fields: " . implode(', ', $update_fields);
+        audit_log('group_updated', $group_cn, $update_details, 'success', $USER_ID);
         render_alert_banner("The group attributes have been updated.");
       }
       else {
+        // Audit log failed update
+        audit_log('group_update_failure', $group_cn, "Failed to update group attributes", 'failure', $USER_ID);
         render_alert_banner("There was a problem updating the group attributes.  See the logs for more information.","danger",15000);
       }
 
     }
 
     foreach ($members_to_add as $this_member) {
-      ldap_add_member_to_group($ldap_connection,$group_cn,$this_member);
+      if (ldap_add_member_to_group($ldap_connection,$group_cn,$this_member)) {
+        // Audit log member addition
+        audit_log('group_member_added', $group_cn, "User added to group: {$this_member}", 'success', $USER_ID);
+      }
     }
 
     foreach ($members_to_del as $this_member) {
-      ldap_delete_member_from_group($ldap_connection,$group_cn,$this_member);
+      if (ldap_delete_member_from_group($ldap_connection,$group_cn,$this_member)) {
+        // Audit log member removal
+        audit_log('group_member_removed', $group_cn, "User removed from group: {$this_member}", 'success', $USER_ID);
+      }
     }
 
     $non_members = array_diff($all_people,$updated_membership);
@@ -235,6 +253,103 @@ if (isset($_POST["update_members"])) {
     $non_members = $all_people;
 
   }
+
+}
+
+// Handle MFA form submission
+if (isset($_POST["submit_mfa"]) && $MFA_FEATURE_ENABLED) {
+
+  // Handle MFA settings update
+  $debug_info = array();
+  $debug_info[] = "MFA save triggered for group: $group_cn";
+
+  $group_dn = "{$LDAP['group_attribute']}=$group_cn,{$LDAP['group_dn']}";
+  $debug_info[] = "Group DN: $group_dn";
+
+  // Get attribute names from config
+  $mfa_objectclass = $GROUP_MFA_ATTRS['objectclass'];
+  $mfa_required_attr = $GROUP_MFA_ATTRS['required'];
+  $mfa_grace_period_attr = $GROUP_MFA_ATTRS['grace_period'];
+
+  $debug_info[] = "MFA objectclass: $mfa_objectclass";
+  $debug_info[] = "MFA required attr: $mfa_required_attr";
+  $debug_info[] = "MFA grace period attr: $mfa_grace_period_attr";
+
+  // Get current object classes
+  $current_objectclasses = array();
+  if (isset($this_group[0]['objectclass'])) {
+    foreach ($this_group[0]['objectclass'] as $index => $oc) {
+      if ($index !== 'count') {
+        $current_objectclasses[] = $oc;
+      }
+    }
+  }
+
+  $debug_info[] = "Current objectclasses: " . implode(', ', $current_objectclasses);
+
+  // Check if MFA object class exists
+  $has_mfa_oc = false;
+  foreach ($current_objectclasses as $oc) {
+    if (strcasecmp($oc, $mfa_objectclass) == 0) {
+      $has_mfa_oc = true;
+      break;
+    }
+  }
+
+  $debug_info[] = "Has MFA objectclass: " . ($has_mfa_oc ? 'yes' : 'no');
+
+  // Get form values
+  $mfa_required = isset($_POST['mfa_required']) ? 'TRUE' : 'FALSE';
+  $mfa_grace_period = isset($_POST['mfa_grace_period']) ? intval($_POST['mfa_grace_period']) : 7;
+
+  $debug_info[] = "Form mfa_required: $mfa_required";
+  $debug_info[] = "Form mfa_grace_period: $mfa_grace_period";
+
+  // Prepare modifications
+  $modifications = array();
+
+  // Add MFA object class if not present and MFA is being enabled
+  if (!$has_mfa_oc && $mfa_required == 'TRUE') {
+    $current_objectclasses[] = $mfa_objectclass;
+    $modifications['objectClass'] = $current_objectclasses;
+    $debug_info[] = "Adding MFA objectclass to modifications";
+  }
+
+  // Set MFA attributes
+  $modifications[$mfa_required_attr] = $mfa_required;
+  $modifications[$mfa_grace_period_attr] = strval($mfa_grace_period);
+
+  $debug_info[] = "Modifications: objectClass=" . (isset($modifications['objectClass']) ? implode(',', $modifications['objectClass']) : 'not changed') .
+                  ", $mfa_required_attr=$mfa_required, $mfa_grace_period_attr=$mfa_grace_period";
+
+  // Apply modifications
+  $ldap_connection = open_ldap_connection();
+  $result = @ ldap_mod_replace($ldap_connection, $group_dn, $modifications);
+
+  $debug_info[] = "LDAP result: " . ($result ? 'SUCCESS' : 'FAILED');
+  $ldap_error = ldap_error($ldap_connection);
+  $debug_info[] = "LDAP error/status: " . $ldap_error;
+
+  if ($result) {
+    // Audit log MFA settings update
+    $mfa_details = "MFA required: {$mfa_required}, Grace period: {$mfa_grace_period} days";
+    audit_log('group_mfa_updated', $group_cn, $mfa_details, 'success', $USER_ID);
+
+    $message = "MFA settings for group '$group_cn' have been updated.<br><br><strong>Debug Info:</strong><br>" .
+               implode('<br>', $debug_info);
+    render_alert_banner($message, "success", 15000);
+    // Reload group data
+    $this_group = ldap_get_group_entry($ldap_connection, $group_cn);
+  } else {
+    // Audit log failed MFA update
+    audit_log('group_mfa_update_failure', $group_cn, "Failed to update MFA settings: {$ldap_error}", 'failure', $USER_ID);
+
+    $message = "There was a problem updating MFA settings.<br><br><strong>LDAP Error:</strong> $ldap_error<br><br><strong>Debug Info:</strong><br>" .
+               implode('<br>', $debug_info);
+    render_alert_banner($message, "danger", 20000);
+  }
+
+  $group_members = $current_members;
 
 }
 else {
@@ -392,19 +507,51 @@ ldap_close($ldap_connection);
 
 <div class="container">
   <div class="col-md-12">
-    <div class="accordion">
-      <div class="card">
 
-        <div class="card-header clearfix">
-          <h3 class="float-start" style="padding-top: 7.5px;"><?php print htmlspecialchars(decode_ldap_value($group_cn), ENT_QUOTES, 'UTF-8'); ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h3>
-          <button class="btn btn-warning float-end" onclick="show_delete_group_button();" <?php if ($group_cn == $LDAP["admins_group"]) { print "disabled"; } ?>>Delete group</button>
-          <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/groups.php" method="post" enctype="multipart/form-data"><input type="hidden" name="delete_group" value="<?php print $group_cn; ?>"><button class="btn btn-danger float-end invisible" id="delete_group">Confirm deletion</button></form>
-        </div>
+    <!-- Page Header -->
+    <div class="row mb-3">
+      <div class="col-md-8">
+        <h2><?php print htmlspecialchars(decode_ldap_value($group_cn), ENT_QUOTES, 'UTF-8'); ?><?php if ($group_cn == $LDAP["admins_group"]) { print " <sup>(admin group)</sup>" ; } ?></h2>
+        <p class="text-muted"><?php print htmlspecialchars(decode_ldap_value($full_dn), ENT_QUOTES, 'UTF-8'); ?></p>
+      </div>
+      <div class="col-md-4 text-end">
+        <button class="btn btn-warning" onclick="show_delete_group_button();" <?php if ($group_cn == $LDAP["admins_group"]) { print "disabled"; } ?>>Delete Group</button>
+        <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/groups.php" method="post" enctype="multipart/form-data" style="display: inline;">
+          <input type="hidden" name="delete_group" value="<?php print $group_cn; ?>">
+          <button class="btn btn-danger invisible" id="delete_group">Confirm Deletion</button>
+        </form>
+      </div>
+    </div>
 
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($full_dn), ENT_QUOTES, 'UTF-8'); ?></li>
-        </li>
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs" id="groupTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab" aria-controls="members" aria-selected="true">
+          <i class="bi bi-people"></i> Members
+        </button>
+      </li>
+      <?php if ($MFA_FEATURE_ENABLED == TRUE && !$new_group && $group_exists): ?>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mfa-tab" data-bs-toggle="tab" data-bs-target="#mfa" type="button" role="tab" aria-controls="mfa" aria-selected="false">
+          <i class="bi bi-shield-lock"></i> MFA Settings
+        </button>
+      </li>
+      <?php endif; ?>
+      <?php if (count($attribute_map) > 0): ?>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="attributes-tab" data-bs-toggle="tab" data-bs-target="#attributes" type="button" role="tab" aria-controls="attributes" aria-selected="false">
+          <i class="bi bi-gear"></i> Attributes
+        </button>
+      </li>
+      <?php endif; ?>
+    </ul>
 
+    <!-- Tab Content -->
+    <div class="tab-content" id="groupTabContent">
+
+      <!-- Members Tab -->
+      <div class="tab-pane fade show active" id="members" role="tabpanel" aria-labelledby="members-tab">
+        <div class="card border-top-0">
         <div class="card-body">
           <div class="row">
             <div class="dual-list list-left col-md-5">
@@ -481,13 +628,14 @@ ldap_close($ldap_connection);
           </div>
         </div>
       </div>
-<?php
-
-if (count($attribute_map) > 0) { ?>
-      <div class="card">
-        <div class="card-header clearfix">
-          <h3 class="float-start" style="padding-top: 7.5px;">Group attributes</h3>
         </div>
+      </div>
+      <!-- End Members Tab -->
+
+<?php if (count($attribute_map) > 0) { ?>
+      <!-- Attributes Tab -->
+      <div class="tab-pane fade" id="attributes" role="tabpanel" aria-labelledby="attributes-tab">
+        <div class="card border-top-0">
         <div class="card-body">
           <div class="col-md-8">
             <?php
@@ -513,9 +661,163 @@ if (count($attribute_map) > 0) { ?>
           </div>
         </div>
       </div>
+        </div>
+      </div>
+      <!-- End Attributes Tab -->
 <?php } ?>
-              </form>
+
+<?php
+// MFA Settings Section
+if ($MFA_FEATURE_ENABLED && !$new_group && $group_exists) {
+  // Get attribute names from config
+  $mfa_objectclass = $GROUP_MFA_ATTRS['objectclass'];
+  $mfa_required_attr = strtolower($GROUP_MFA_ATTRS['required']);
+  $mfa_grace_period_attr = strtolower($GROUP_MFA_ATTRS['grace_period']);
+
+  // Get current MFA settings for this group
+  $group_mfa_required = false;
+  $group_mfa_grace_period = 7; // default
+
+  if (isset($this_group[0][$mfa_required_attr][0])) {
+    $group_mfa_required = (strcasecmp($this_group[0][$mfa_required_attr][0], 'TRUE') == 0);
+  }
+  if (isset($this_group[0][$mfa_grace_period_attr][0])) {
+    $group_mfa_grace_period = intval($this_group[0][$mfa_grace_period_attr][0]);
+  }
+
+  // Check if group has MFA object class
+  $has_mfa_objectclass = false;
+  if (isset($this_group[0]['objectclass'])) {
+    foreach ($this_group[0]['objectclass'] as $oc) {
+      if (strcasecmp($oc, $mfa_objectclass) == 0) {
+        $has_mfa_objectclass = true;
+        break;
+      }
+    }
+  }
+?>
+      <!-- MFA Settings Tab -->
+      <div class="tab-pane fade" id="mfa" role="tabpanel" aria-labelledby="mfa-tab">
+        <div class="card border-top-0">
+        <div class="card-body">
+          <div class="col-md-8">
+            <p class="text-muted">
+              Configure MFA requirements for members of this group. When enabled, users in this group will be required to set up TOTP-based multi-factor authentication.
+            </p>
+
+            <?php
+            // Display current MFA status
+            $mfa_required_attr = $GROUP_MFA_ATTRS['required'];
+            $mfa_grace_period_attr = $GROUP_MFA_ATTRS['grace_period'];
+            $has_mfa_required = isset($this_group[0][strtolower($mfa_required_attr)][0]);
+            $mfa_is_required = $has_mfa_required && (strcasecmp($this_group[0][strtolower($mfa_required_attr)][0], 'TRUE') == 0);
+
+            if ($has_mfa_required) {
+              $mfa_grace = isset($this_group[0][strtolower($mfa_grace_period_attr)][0]) ?
+                           $this_group[0][strtolower($mfa_grace_period_attr)][0] : 'Not set';
+              $badge_class = $mfa_is_required ? 'bg-success' : 'bg-secondary';
+              $badge_text = $mfa_is_required ? 'Required' : 'Not required';
+            ?>
+            <div class="alert alert-info mb-3">
+              <strong><i class="bi bi-shield-lock"></i> Current Status:</strong>
+              <span class="badge <?php echo $badge_class; ?>"><?php echo $badge_text; ?></span>
+              <?php if ($mfa_is_required) { ?>
+                <span class="text-muted ms-2">(Grace period: <?php echo htmlspecialchars($mfa_grace); ?> days)</span>
+              <?php } ?>
+            </div>
+            <?php } else { ?>
+            <div class="alert alert-secondary mb-3">
+              <strong><i class="bi bi-shield-lock"></i> Current Status:</strong>
+              <span class="badge bg-secondary">Not configured</span>
+            </div>
+            <?php } ?>
+
+            <div class="row mb-3">
+              <label class="col-md-3 col-form-label">
+                Require MFA
+              </label>
+              <div class="col-md-4">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox"
+                         id="mfa_required" name="mfa_required"
+                         <?php if ($group_mfa_required) echo 'checked'; ?>
+                         <?php if (count($group_members)==0) print 'disabled'; ?>>
+                  <label class="form-check-label" for="mfa_required">
+                    Members must enroll in MFA
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <label for="mfa_grace_period" class="col-md-3 col-form-label">
+                Grace Period (days)
+              </label>
+              <div class="col-md-4">
+                <input type="number" class="form-control"
+                       id="mfa_grace_period" name="mfa_grace_period"
+                       value="<?php echo $group_mfa_grace_period; ?>"
+                       min="1" max="365"
+                       <?php if (count($group_members)==0) print 'disabled'; ?>>
+                <small class="form-text text-muted">
+                  Days users have to set up MFA after being added to this group
+                </small>
+              </div>
+            </div>
+
+            <?php if (!$has_mfa_objectclass) { ?>
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i>
+              Enabling MFA will add the <code><?php echo htmlspecialchars($mfa_objectclass); ?></code> object class to this group.
+            </div>
+            <?php } ?>
+
+            <div class="row">
+              <div class="col-md-4 offset-md-3">
+                <button type="submit" class="btn btn-info"
+                        id="submit_mfa"
+                        name="submit_mfa"
+                        <?php if (count($group_members)==0) print 'disabled'; ?>>
+                  Save MFA Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+      </div>
+      <!-- End MFA Settings Tab -->
+<?php } ?>
+
     </div>
+    <!-- End Tab Content -->
+
   </div>
 </div>
+
+<script>
+// Tab state persistence
+document.addEventListener('DOMContentLoaded', function() {
+  // Restore last active tab from localStorage
+  const lastTab = localStorage.getItem('show_group_active_tab');
+  if (lastTab) {
+    const tabButton = document.querySelector(`button[data-bs-target="${lastTab}"]`);
+    if (tabButton) {
+      const tab = new bootstrap.Tab(tabButton);
+      tab.show();
+    }
+  }
+
+  // Save active tab to localStorage when changed
+  const tabButtons = document.querySelectorAll('#groupTabs button[data-bs-toggle="tab"]');
+  tabButtons.forEach(button => {
+    button.addEventListener('shown.bs.tab', function(e) {
+      localStorage.setItem('show_group_active_tab', e.target.dataset.bsTarget);
+    });
+  });
+});
+</script>
+
+              </form>
 <?php render_footer(); ?>

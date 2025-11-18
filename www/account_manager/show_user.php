@@ -5,6 +5,8 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
 include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
+include_once "password_policy_functions.inc.php";
 include_once "module_functions.inc.php";
 set_page_access("admin");
 
@@ -65,9 +67,77 @@ if (isset($_POST['regenerate_backup_codes'])) {
         );
 
         if (ldap_mod_replace($ldap_connection, $regenerate_dn, $modifications)) {
+          // Audit log backup code regeneration
+          audit_log('mfa_backup_codes_regenerated', $account_identifier, "Admin regenerated backup codes for user", 'success', $USER_ID);
           render_alert_banner("New backup codes have been generated. The user should be notified to collect them from their Manage MFA page.");
         } else {
+          audit_log('mfa_backup_codes_regen_failure', $account_identifier, "Failed to regenerate backup codes", 'failure', $USER_ID);
           render_alert_banner("Failed to regenerate backup codes. Check the logs for more information.", "danger", 15000);
+        }
+      }
+    }
+  }
+}
+
+// Handle account expiration updates (admin only)
+if (isset($_POST['update_account_expiry']) || isset($_POST['remove_account_expiry'])) {
+  if ($LIFECYCLE_ENABLED == TRUE && $ACCOUNT_EXPIRY_ENABLED == TRUE) {
+    include_once "account_lifecycle_functions.inc.php";
+
+    $lifecycle_search = ldap_search($ldap_connection, $LDAP['user_dn'], $ldap_search_query);
+    if ($lifecycle_search) {
+      $lifecycle_user = ldap_get_entries($ldap_connection, $lifecycle_search);
+      if ($lifecycle_user['count'] > 0) {
+        $lifecycle_dn = $lifecycle_user[0]['dn'];
+
+        if (isset($_POST['remove_account_expiry'])) {
+          // Remove account expiration
+          if (account_lifecycle_set_expiry($ldap_connection, $lifecycle_dn, null)) {
+            audit_log('account_expiry_removed', $account_identifier, "Admin removed account expiration", 'success', $USER_ID);
+            render_alert_banner("Account expiration has been removed. Account will not expire.");
+          } else {
+            audit_log('account_expiry_remove_failure', $account_identifier, "Failed to remove account expiration", 'failure', $USER_ID);
+            render_alert_banner("Failed to remove account expiration. Check the logs for more information.", "danger", 15000);
+          }
+        } elseif (isset($_POST['account_expiry_date']) && !empty($_POST['account_expiry_date'])) {
+          // Set account expiration date
+          $expiry_date_input = $_POST['account_expiry_date'];
+          $expiry_timestamp = strtotime($expiry_date_input . ' 23:59:59'); // End of day
+
+          if ($expiry_timestamp !== false) {
+            if (account_lifecycle_set_expiry($ldap_connection, $lifecycle_dn, $expiry_timestamp)) {
+              audit_log('account_expiry_set', $account_identifier, "Admin set account expiration to " . date('Y-m-d', $expiry_timestamp), 'success', $USER_ID);
+              render_alert_banner("Account expiration has been set to " . date('F j, Y', $expiry_timestamp) . ".");
+            } else {
+              audit_log('account_expiry_set_failure', $account_identifier, "Failed to set account expiration", 'failure', $USER_ID);
+              render_alert_banner("Failed to set account expiration. Check the logs for more information.", "danger", 15000);
+            }
+          } else {
+            render_alert_banner("Invalid date format. Please use YYYY-MM-DD.", "danger", 15000);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Handle account unlock (admin only)
+if (isset($_POST['unlock_account'])) {
+  if ($LIFECYCLE_ENABLED == TRUE && $PPOLICY_ENABLED == TRUE) {
+    include_once "account_lifecycle_functions.inc.php";
+
+    $unlock_search = ldap_search($ldap_connection, $LDAP['user_dn'], $ldap_search_query);
+    if ($unlock_search) {
+      $unlock_user = ldap_get_entries($ldap_connection, $unlock_search);
+      if ($unlock_user['count'] > 0) {
+        $unlock_dn = $unlock_user[0]['dn'];
+
+        if (account_lifecycle_unlock($ldap_connection, $unlock_dn)) {
+          audit_log('account_unlocked', $account_identifier, "Admin unlocked account", 'success', $USER_ID);
+          render_alert_banner("Account has been unlocked successfully.");
+        } else {
+          audit_log('account_unlock_failure', $account_identifier, "Failed to unlock account", 'failure', $USER_ID);
+          render_alert_banner("Failed to unlock account. Check the logs for more information.", "danger", 15000);
         }
       }
     }
@@ -173,16 +243,55 @@ if ($ldap_search) {
 
     $password = $_POST['password'];
 
-    if ((!is_numeric($_POST['pass_score']) or $_POST['pass_score'] < 3) and $ACCEPT_WEAK_PASSWORDS != TRUE) { $weak_password = TRUE; }
+    // Use password policy strength check if enabled, otherwise fall back to client-side score
+    if (!$PASSWORD_POLICY_ENABLED && (!is_numeric($_POST['pass_score']) or $_POST['pass_score'] < 3) and $ACCEPT_WEAK_PASSWORDS != TRUE) { $weak_password = TRUE; }
     if (preg_match("/\"|'/",$password)) { $invalid_password = TRUE; }
     if ($_POST['password'] != $_POST['password_match']) { $mismatched_passwords = TRUE; }
     if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$account_identifier)) { $invalid_username = TRUE; }
 
+    // Password policy validation
+    $password_policy_errors = array();
+    $password_fails_policy = false;
+    if (!password_policy_validate($password, $password_policy_errors)) {
+      $password_fails_policy = true;
+    }
+    $password_strength_score = 0;
+    if (!password_policy_check_strength($password, $password_strength_score)) {
+      $password_fails_policy = true;
+      if (empty($password_policy_errors)) {
+        $password_policy_errors[] = "Password strength is too weak";
+      }
+    }
+
+    // Check password history
+    $password_in_history = FALSE;
+    if (!$password_fails_policy && password_policy_check_history($ldap_connection, $dn, $password)) {
+      $password_in_history = TRUE;
+      $password_policy_errors[] = "Password was used recently and cannot be reused";
+    }
+
     if ( !$mismatched_passwords
        and !$weak_password
        and !$invalid_password
+       and !$password_fails_policy
+       and !$password_in_history
                              ) {
-     $to_update['userpassword'][0] = ldap_hashed_password($password);
+     error_log("$log_prefix Password change requested for {$dn}");
+     error_log("$log_prefix PASSWORD_POLICY_ENABLED=" . var_export($PASSWORD_POLICY_ENABLED, true));
+     // Try to use Password Modify Extended Operation if ppolicy is available
+     // This allows ppolicy overlay to track password history automatically
+     if ($PASSWORD_POLICY_ENABLED && password_policy_change_password($ldap_connection, $dn, $password)) {
+       $password_was_changed = true;
+       $password_changed_via_exop = true;
+       error_log("$log_prefix Password changed via extended operation");
+     } else {
+       // Fall back to traditional method (pre-hash the password)
+       error_log("$log_prefix Falling back to traditional password change");
+       $password_hash = ldap_hashed_password($password);
+       $to_update['userpassword'][0] = $password_hash;
+       $password_was_changed = true;
+       $new_password_hash = $password_hash;
+     }
     }
   }
 
@@ -235,9 +344,23 @@ if ($ldap_search) {
     }
 
   if ($updated_account) {
+    // Update password policy tracking if password was changed via traditional method
+    // (If changed via exop, ppolicy overlay handles this automatically)
+    if (isset($password_was_changed) && $password_was_changed && isset($new_password_hash) && !isset($password_changed_via_exop)) {
+      password_policy_set_changed_time($ldap_connection, $dn);
+      password_policy_add_to_history($ldap_connection, $dn, $new_password_hash);
+    }
+
+    // Audit log user update
+    $update_fields = array_keys($to_update);
+    $update_details = "Updated fields: " . implode(', ', $update_fields);
+    audit_log('user_updated', $account_identifier, $update_details, 'success', $USER_ID);
     render_alert_banner("The account has been updated.  $sent_email_message");
   }
   else {
+    // Audit log failed update
+    $error_msg = ldap_error($ldap_connection);
+    audit_log('user_update_failure', $account_identifier, "Failed to update user: {$error_msg}", 'failure', $USER_ID);
     render_alert_banner("There was a problem updating the account.  Check the logs for more information.","danger",15000);
   }
  }
@@ -258,6 +381,23 @@ if ($ldap_search) {
  if ($mismatched_passwords) {  ?>
  <div class="alert alert-warning">
   <p class="text-center">The passwords didn't match.</p>
+ </div>
+ <?php }
+
+ if (isset($password_fails_policy) && $password_fails_policy && !empty($password_policy_errors)) { ?>
+ <div class="alert alert-warning">
+  <p class="text-center"><strong>Password Policy Errors:</strong></p>
+  <ul>
+   <?php foreach ($password_policy_errors as $policy_error) { ?>
+     <li><?php echo htmlspecialchars($policy_error); ?></li>
+   <?php } ?>
+  </ul>
+ </div>
+ <?php }
+
+ if (isset($password_in_history) && $password_in_history) { ?>
+ <div class="alert alert-warning">
+  <p class="text-center">This password was used recently and cannot be reused.</p>
  </div>
  <?php }
 
@@ -291,10 +431,16 @@ if ($ldap_search) {
   $groups_to_del = array_diff($currently_member_of,$updated_group_membership);
 
   foreach ($groups_to_del as $this_group) {
-   ldap_delete_member_from_group($ldap_connection,$this_group,$account_identifier);
+   if (ldap_delete_member_from_group($ldap_connection,$this_group,$account_identifier)) {
+     // Audit log group removal
+     audit_log('user_removed_from_group', $account_identifier, "Removed from group: {$this_group}", 'success', $USER_ID);
+   }
   }
   foreach ($groups_to_add as $this_group) {
-   ldap_add_member_to_group($ldap_connection,$this_group,$account_identifier);
+   if (ldap_add_member_to_group($ldap_connection,$this_group,$account_identifier)) {
+     // Audit log group addition
+     audit_log('user_added_to_group', $account_identifier, "Added to group: {$this_group}", 'success', $USER_ID);
+   }
   }
 
   $not_member_of = array_diff($all_groups,$updated_group_membership);
@@ -315,7 +461,7 @@ if ($ldap_search) {
 
  // Initialize password strength meter
  document.addEventListener('DOMContentLoaded', function() {
-   initPasswordStrength('password');
+   initPasswordStrength('password_field');
  });
 
  function show_delete_user_button() {
@@ -324,7 +470,7 @@ if ($ldap_search) {
  }
 
  function check_passwords_match() {
-   const password = document.getElementById('password');
+   const password = document.getElementById('password_field');
    const confirm = document.getElementById('confirm');
 
    if (password.value != confirm.value) {
@@ -505,21 +651,79 @@ if ($ldap_search) {
     width: 200px;
     float: right;
   }
+
+  /* Remove extra spacing from tab content */
+  .tab-content {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  .tab-content .tab-pane {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
 </style>
 
 
 <div class="container">
- <div class="col-sm-8 offset-md-2">
+ <div class="col-sm-12">
 
-  <div class="card">
-    <div class="card-header clearfix">
-     <span class="float-start"><h3><?php print htmlspecialchars(decode_ldap_value($account_identifier), ENT_QUOTES, 'UTF-8'); ?></h3></span>
-     <button class="btn btn-warning float-end align-self-end" style="margin-top: auto;" onclick="show_delete_user_button();" <?php if ($account_identifier == $USER_ID) { print "disabled"; }?>>Delete account</button>
-     <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/index.php" method="post"><input type="hidden" name="delete_user" value="<?php print urlencode($account_identifier); ?>"><button class="btn btn-danger float-end invisible" id="delete_user">Confirm deletion</button></form>
+  <!-- Page Header -->
+  <div class="row mb-3">
+    <div class="col-md-8">
+      <h2><?php print htmlspecialchars(decode_ldap_value($account_identifier), ENT_QUOTES, 'UTF-8'); ?></h2>
+      <p class="text-muted"><?php print htmlspecialchars(decode_ldap_value($dn), ENT_QUOTES, 'UTF-8'); ?></p>
     </div>
-    <ul class="list-group list-group-flush">
-      <li class="list-group-item"><?php print htmlspecialchars(decode_ldap_value($dn), ENT_QUOTES, 'UTF-8'); ?></li>
+    <div class="col-md-4 text-end">
+      <button class="btn btn-warning" onclick="show_delete_user_button();" <?php if ($account_identifier == $USER_ID) { print "disabled"; }?>>Delete Account</button>
+      <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/index.php" method="post" style="display: inline;">
+        <input type="hidden" name="delete_user" value="<?php print urlencode($account_identifier); ?>">
+        <button class="btn btn-danger invisible" id="delete_user">Confirm Deletion</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <ul class="nav nav-tabs" id="userTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab" aria-controls="details" aria-selected="true">
+        <i class="bi bi-person-badge"></i> Details
+      </button>
     </li>
+    <?php if ($MFA_FULLY_OPERATIONAL == TRUE): ?>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="mfa-tab" data-bs-toggle="tab" data-bs-target="#mfa" type="button" role="tab" aria-controls="mfa" aria-selected="false">
+        <i class="bi bi-shield-lock"></i> MFA Status
+      </button>
+    </li>
+    <?php endif; ?>
+    <?php if ($PASSWORD_POLICY_ENABLED == TRUE && $PPOLICY_ENABLED == TRUE && $PASSWORD_EXPIRY_DAYS > 0): ?>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab" aria-controls="password" aria-selected="false">
+        <i class="bi bi-key"></i> Password
+      </button>
+    </li>
+    <?php endif; ?>
+    <?php if ($LIFECYCLE_ENABLED == TRUE && $ACCOUNT_EXPIRY_ENABLED == TRUE): ?>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="lifecycle-tab" data-bs-toggle="tab" data-bs-target="#lifecycle" type="button" role="tab" aria-controls="lifecycle" aria-selected="false">
+        <i class="bi bi-arrow-repeat"></i> Account Lifecycle
+      </button>
+    </li>
+    <?php endif; ?>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups" type="button" role="tab" aria-controls="groups" aria-selected="false">
+        <i class="bi bi-people"></i> Groups
+      </button>
+    </li>
+  </ul>
+
+  <!-- Tab Content -->
+  <div class="tab-content" id="userTabContent">
+
+    <!-- Details Tab -->
+    <div class="tab-pane fade show active" id="details" role="tabpanel" aria-labelledby="details-tab">
+      <div class="card border-top-0">
     <div class="card-body">
      <form class="form-horizontal" action="" enctype="multipart/form-data" method="post">
 
@@ -539,9 +743,9 @@ if ($ldap_search) {
       ?>
 
       <div class="row mb-3" id="password_div">
-       <label for="password" class="col-sm-3 col-form-label">Password</label>
+       <label for="password_field" class="col-sm-3 col-form-label">Password</label>
        <div class="col-sm-6">
-        <input type="password" class="form-control" id="password" name="password" onkeyup="back_to_hidden('password','confirm'); check_if_we_should_enable_sending_email();">
+        <input type="password" class="form-control" id="password_field" name="password" onkeyup="back_to_hidden('password_field','confirm'); check_if_we_should_enable_sending_email();">
        </div>
        <div class="col-sm-1">
         <input type="button" class="btn btn-sm" id="password_generator" onclick="random_password(); check_if_we_should_enable_sending_email();" value="Generate password">
@@ -579,22 +783,19 @@ if ($ldap_search) {
 
    </div>
   </div>
+    </div>
+    <!-- End Details Tab -->
 
- </div>
-</div>
-
-<?php if ($MFA_ENABLED == TRUE) {
+<?php if ($MFA_FEATURE_ENABLED == TRUE) {
   // Get MFA status for this user
   $user_totp_status = isset($user[0]['totpstatus'][0]) ? $user[0]['totpstatus'][0] : 'none';
   $user_backup_code_count = totp_get_backup_code_count($ldap_connection, $dn);
-  $user_requires_mfa = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
+  $mfa_result = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
+  $user_requires_mfa = $mfa_result['required'];
 ?>
-<div class="container">
- <div class="col-sm-8 offset-md-2">
-  <div class="card">
-   <div class="card-header clearfix">
-    <h3 class="float-start" style="padding-top: 7.5px;">Multi-Factor Authentication</h3>
-   </div>
+    <!-- MFA Status Tab -->
+    <div class="tab-pane fade" id="mfa" role="tabpanel" aria-labelledby="mfa-tab">
+      <div class="card border-top-0">
    <div class="card-body">
     <table class="table table-condensed">
       <tr>
@@ -656,22 +857,240 @@ if ($ldap_search) {
 
    </div>
   </div>
- </div>
-</div>
+      </div>
+    </div>
+    <!-- End MFA Status Tab -->
 <?php } ?>
 
-<div class="container">
- <div class="col-sm-12">
+<?php
+// Display password expiry information if password policy is enabled
+if ($PASSWORD_POLICY_ENABLED == TRUE && $PPOLICY_ENABLED == TRUE && $PASSWORD_EXPIRY_DAYS > 0) {
+  include_once "password_policy_functions.inc.php";
 
-  <div class="card">
-   <div class="card-header clearfix">
-    <h3 class="float-start" style="padding-top: 7.5px;">Group membership</h3>
+  $password_changed_time = password_policy_get_changed_time($ldap_connection, $dn);
+
+  // Calculate password info if available
+  $password_changed_formatted = null;
+  $password_age_days = null;
+  $password_expires_in_days = null;
+  $expiry_date = null;
+  $status_badge = 'bg-secondary';
+  $status_text = 'Unknown';
+
+  if ($password_changed_time) {
+    // Calculate password age and expiry
+    $timestamp = strtotime($password_changed_time);
+    $password_changed_formatted = date('F j, Y \a\t g:i A', $timestamp);
+    $age_seconds = time() - $timestamp;
+    $password_age_days = floor($age_seconds / 86400);
+    $password_expires_in_days = $PASSWORD_EXPIRY_DAYS - $password_age_days;
+    $expiry_date = date('F j, Y', $timestamp + ($PASSWORD_EXPIRY_DAYS * 86400));
+
+    // Determine status
+    $status_badge = 'bg-success';
+    $status_text = 'OK';
+    if ($password_expires_in_days <= 0) {
+      $status_badge = 'bg-danger';
+      $status_text = 'Expired';
+    } elseif ($password_expires_in_days <= $PASSWORD_EXPIRY_WARNING_DAYS) {
+      $status_badge = 'bg-warning text-dark';
+      $status_text = 'Expiring Soon';
+    }
+  }
+?>
+    <!-- Password Tab -->
+    <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
+      <div class="card border-top-0">
+    <div class="card-body">
+      <?php if ($password_changed_time): ?>
+    <table class="table table-condensed">
+      <tr>
+        <th width="30%">Password Status:</th>
+        <td>
+          <span class="badge <?php echo $status_badge; ?>"><?php echo $status_text; ?></span>
+        </td>
+      </tr>
+      <tr>
+        <th>Last Changed:</th>
+        <td><?php echo $password_changed_formatted; ?></td>
+      </tr>
+      <tr>
+        <th>Password Age:</th>
+        <td><?php echo $password_age_days; ?> day<?php echo $password_age_days != 1 ? 's' : ''; ?></td>
+      </tr>
+      <tr>
+        <th>Expiry Date:</th>
+        <td><?php echo $expiry_date; ?></td>
+      </tr>
+      <tr>
+        <th>Days Until Expiry:</th>
+        <td>
+          <?php if ($password_expires_in_days > 0): ?>
+            <span class="text-<?php echo $status_badge == 'bg-warning text-dark' ? 'warning' : 'success'; ?>">
+              <?php echo $password_expires_in_days; ?> day<?php echo $password_expires_in_days != 1 ? 's' : ''; ?>
+            </span>
+          <?php else: ?>
+            <span class="text-danger">Password has expired</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+    </table>
+      <?php else: ?>
+      <div class="alert alert-info">
+        <p><strong><i class="bi bi-info-circle"></i> Password Information Not Available</strong></p>
+        <p>Password expiry tracking requires the ppolicy overlay to be configured on the LDAP server and the user to have changed their password at least once.</p>
+      </div>
+      <?php endif; ?>
    </div>
-   <div class="card-body">
+  </div>
+    </div>
+    <!-- End Password Tab -->
+<?php
+}
+?>
 
-    <div class="row">
+<?php
+// Display account lifecycle information if enabled
+if ($LIFECYCLE_ENABLED == TRUE && $ACCOUNT_EXPIRY_ENABLED == TRUE) {
+  include_once "account_lifecycle_functions.inc.php";
 
-         <div class="dual-list list-left col-md-5">
+  // Get account expiration information
+  $account_days_remaining = null;
+  $account_is_expired = account_lifecycle_is_expired($ldap_connection, $dn, $account_days_remaining);
+  $account_expiry_date_formatted = account_lifecycle_get_expiry_date_formatted($ldap_connection, $dn, 'F j, Y \a\t g:i A');
+  $account_expiry_timestamp = account_lifecycle_get_expiry_timestamp($ldap_connection, $dn);
+  $account_create_time = account_lifecycle_get_create_time($ldap_connection, $dn);
+  $account_modify_time = account_lifecycle_get_modify_time($ldap_connection, $dn);
+
+  // Convert LDAP timestamps to formatted strings
+  $account_created_formatted = null;
+  if ($account_create_time) {
+    $create_timestamp = account_lifecycle_ldap_to_timestamp($account_create_time);
+    if ($create_timestamp) {
+      $account_created_formatted = date('F j, Y \a\t g:i A', $create_timestamp);
+    }
+  }
+
+  // Determine account status
+  $account_status_badge = 'bg-success';
+  $account_status_text = 'Active';
+  if ($account_is_expired) {
+    $account_status_badge = 'bg-danger';
+    $account_status_text = 'Expired';
+  } elseif ($account_days_remaining !== null && $account_days_remaining > 0 && $account_days_remaining <= $ACCOUNT_EXPIRY_WARNING_DAYS) {
+    $account_status_badge = 'bg-warning text-dark';
+    $account_status_text = 'Expiring Soon';
+  } elseif ($account_expiry_date_formatted === null) {
+    $account_status_text = 'No Expiration';
+  }
+
+  // Check if account is locked (requires ppolicy)
+  $account_is_locked = false;
+  if ($PPOLICY_ENABLED == TRUE) {
+    $account_is_locked = account_lifecycle_is_locked($ldap_connection, $dn);
+    if ($account_is_locked) {
+      $account_status_badge = 'bg-danger';
+      $account_status_text = 'Locked';
+    }
+  }
+?>
+    <!-- Account Lifecycle Tab -->
+    <div class="tab-pane fade" id="lifecycle" role="tabpanel" aria-labelledby="lifecycle-tab">
+      <div class="card border-top-0">
+      <div class="card-body">
+    <table class="table table-condensed">
+      <tr>
+        <th width="30%">Account Status:</th>
+        <td>
+          <span class="badge <?php echo $account_status_badge; ?>"><?php echo $account_status_text; ?></span>
+        </td>
+      </tr>
+      <?php if ($account_created_formatted): ?>
+      <tr>
+        <th>Account Created:</th>
+        <td><?php echo $account_created_formatted; ?></td>
+      </tr>
+      <?php endif; ?>
+      <?php if ($account_expiry_date_formatted !== null): ?>
+      <tr>
+        <th>Expiration Date:</th>
+        <td><?php echo $account_expiry_date_formatted; ?></td>
+      </tr>
+      <tr>
+        <th>Days Until Expiry:</th>
+        <td>
+          <?php if ($account_is_expired): ?>
+            <span class="text-danger">Account expired <?php echo abs($account_days_remaining); ?> day<?php echo abs($account_days_remaining) != 1 ? 's' : ''; ?> ago</span>
+          <?php elseif ($account_days_remaining !== null && $account_days_remaining > 0): ?>
+            <span class="text-<?php echo $account_status_badge == 'bg-warning text-dark' ? 'warning' : 'success'; ?>">
+              <?php echo $account_days_remaining; ?> day<?php echo $account_days_remaining != 1 ? 's' : ''; ?>
+            </span>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php else: ?>
+      <tr>
+        <th>Expiration Date:</th>
+        <td><em>No expiration date set</em></td>
+      </tr>
+      <?php endif; ?>
+      <?php if ($PPOLICY_ENABLED == TRUE): ?>
+      <tr>
+        <th>Account Locked:</th>
+        <td>
+          <?php if ($account_is_locked): ?>
+            <span class="badge bg-danger">Yes</span>
+          <?php else: ?>
+            <span class="badge bg-success">No</span>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endif; ?>
+    </table>
+
+    <!-- Admin controls for setting expiration -->
+    <div class="mt-3">
+      <form method="POST" action="" id="set_account_expiry_form">
+        <input type="hidden" name="account_identifier" value="<?php echo htmlspecialchars($account_identifier); ?>">
+        <div class="row mb-3">
+          <label for="account_expiry_date" class="col-sm-4 col-form-label">Set Expiration Date:</label>
+          <div class="col-sm-8">
+            <div class="input-group">
+              <input type="date" class="form-control" id="account_expiry_date" name="account_expiry_date"
+                     value="<?php echo $account_expiry_timestamp ? date('Y-m-d', $account_expiry_timestamp) : ''; ?>">
+              <button type="submit" name="update_account_expiry" class="btn btn-primary">Update</button>
+              <?php if ($account_expiry_timestamp !== null): ?>
+              <button type="submit" name="remove_account_expiry" class="btn btn-danger">Remove</button>
+              <?php endif; ?>
+            </div>
+            <small class="form-text text-muted">Leave blank or click "Remove" to set no expiration</small>
+          </div>
+        </div>
+      </form>
+
+      <?php if ($PPOLICY_ENABLED == TRUE && $account_is_locked): ?>
+      <form method="POST" action="" id="unlock_account_form" class="mt-2">
+        <input type="hidden" name="account_identifier" value="<?php echo htmlspecialchars($account_identifier); ?>">
+        <button type="submit" name="unlock_account" class="btn btn-warning">
+          <i class="bi bi-unlock"></i> Unlock Account
+        </button>
+      </form>
+      <?php endif; ?>
+    </div>
+
+      </div>
+      </div>
+    </div>
+    <!-- End Account Lifecycle Tab -->
+<?php
+}
+?>
+    <!-- Groups Tab -->
+    <div class="tab-pane fade" id="groups" role="tabpanel" aria-labelledby="groups-tab">
+      <div class="card border-top-0">
+      <div class="card-body">
+        <div class="row">
+          <div class="dual-list list-left col-md-5">
           <strong>Member of</strong>
           <div class="well">
            <div class="row">
@@ -746,11 +1165,40 @@ if ($ldap_search) {
 
    </div>
 	</div>
+      </div>
+    </div>
+    <!-- End Groups Tab -->
+
+  </div>
+  <!-- End Tab Content -->
+
+ </div>
 </div>
 
+<script>
+// Tab state persistence
+document.addEventListener('DOMContentLoaded', function() {
+  // Restore last active tab from localStorage
+  const lastTab = localStorage.getItem('show_user_active_tab');
+  if (lastTab) {
+    const tabButton = document.querySelector(`button[data-bs-target="${lastTab}"]`);
+    if (tabButton) {
+      const tab = new bootstrap.Tab(tabButton);
+      tab.show();
+    }
+  }
+
+  // Save active tab to localStorage when changed
+  const tabButtons = document.querySelectorAll('#userTabs button[data-bs-toggle="tab"]');
+  tabButtons.forEach(button => {
+    button.addEventListener('shown.bs.tab', function(e) {
+      localStorage.setItem('show_user_active_tab', e.target.dataset.bsTarget);
+    });
+  });
+});
+</script>
 
 <?php
-
 }
 
 render_footer();

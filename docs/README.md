@@ -2,10 +2,42 @@
 
 This directory contains documentation for the Luminary LDAP User Manager.
 
-## Files
+## Documentation Files
 
-- **configuration.md** - Complete configuration reference (auto-generated)
+### User Documentation
+
+- **[configuration-guide.md](configuration-guide.md)** - Comprehensive configuration guide with examples and best practices
+  - Getting started and Docker secrets
+  - Web server configuration (SSL, ports, reverse proxy)
+  - Advanced LDAP configuration
+  - User profile customization with detailed examples
+  - Email setup
+  - Common scenarios and troubleshooting
+
+- **[configuration.md](configuration.md)** - Complete configuration reference (auto-generated)
+  - Quick reference table for all configuration options
+  - Auto-generated from the configuration registry
+  - Organized by category with defaults, types, and environment variables
+
+- **[mfa.md](mfa.md)** - Multi-factor authentication guide
+- **[advanced.md](advanced.md)** - Advanced topics and customization
+- **[non-docker.md](non-docker.md)** - Running Luminary without Docker
+
+### Developer Documentation
+
 - **generate_config_docs.php** - Script to regenerate configuration.md from the config registry
+
+## Which Documentation Should I Read?
+
+### For Initial Setup
+Start with **[configuration-guide.md](configuration-guide.md)** - It provides step-by-step instructions, real-world examples, and best practices.
+
+### For Quick Reference
+Use **[configuration.md](configuration.md)** - It's a comprehensive auto-generated table of all options with defaults and types.
+
+### For Advanced Features
+- MFA/TOTP: See **[mfa.md](mfa.md)**
+- Custom schemas, objectClasses: See **[advanced.md](advanced.md)**
 
 ## Regenerating Configuration Documentation
 
@@ -30,7 +62,9 @@ After adding new configuration options to the registry, regenerate the documenta
 
 1. Add your configuration to `www/includes/config_registry.inc.php`
 2. Run the generator script (see above)
-3. Commit both the registry changes and updated documentation
+3. Review the updated `configuration.md`
+4. If adding complex features, update `configuration-guide.md` with detailed examples and instructions
+5. Commit both the registry changes and updated documentation
 
 ## Viewing Current Configuration
 

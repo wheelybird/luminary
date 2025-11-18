@@ -841,7 +841,7 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
 
 function ldap_new_account($ldap_connection,$account_r) {
 
-  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP, $MFA_ENABLED, $MFA_REQUIRED_GROUPS;
+  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP, $MFA_FEATURE_ENABLED, $MFA_REQUIRED_GROUPS;
 
   if (    isset($account_r['givenname'][0])
       and isset($account_r['sn'][0])
@@ -916,11 +916,12 @@ function ldap_new_account($ldap_connection,$account_r) {
        }
 
        // Initialise MFA if enabled and user is in required group
-       if ($MFA_ENABLED && !empty($MFA_REQUIRED_GROUPS)) {
+       if ($MFA_FEATURE_ENABLED) {
          include_once "totp_functions.inc.php";
          $user_dn = "{$LDAP['account_attribute']}=$account_identifier,{$LDAP['user_dn']}";
 
-         if (totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS)) {
+         $mfa_result = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
+         if ($mfa_result['required']) {
            // Add totpUser object class and set status to pending
            $mfa_modifications = array(
              'objectClass' => array_merge($objectclasses, array('totpUser')),

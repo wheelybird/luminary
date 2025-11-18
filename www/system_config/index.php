@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
 set_page_access("admin");
 
 render_header("$ORGANISATION_NAME - System Configuration");
@@ -264,6 +265,229 @@ function display_config_item($key, $metadata) {
       All configuration options are defined in <code>config.inc.php</code>.
       To add new configuration options, add them to the registry and they will automatically appear here.
     </p>
+  </div>
+
+  <!-- System Information Section -->
+  <h2 class="mt-5"><i class="bi bi-info-square"></i> System Information</h2>
+  <p class="text-muted">Runtime environment and server details</p>
+
+  <?php
+  // Get Luminary version
+  $version_file = __DIR__ . '/../VERSION';
+  $luminary_version = 'Unknown';
+  if (file_exists($version_file)) {
+    $luminary_version = trim(file_get_contents($version_file));
+  }
+
+  // Get disk space information
+  $disk_total = @disk_total_space('/');
+  $disk_free = @disk_free_space('/');
+  $disk_used = $disk_total ? $disk_total - $disk_free : 0;
+  $disk_percent = $disk_total ? round(($disk_used / $disk_total) * 100, 1) : 0;
+
+  // Format bytes to human readable
+  function format_bytes($bytes) {
+    if ($bytes >= 1099511627776) {
+      return round($bytes / 1099511627776, 2) . ' TB';
+    } elseif ($bytes >= 1073741824) {
+      return round($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+      return round($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+      return round($bytes / 1024, 2) . ' KB';
+    } else {
+      return $bytes . ' bytes';
+    }
+  }
+
+  // Test LDAP connection
+  $ldap_status = 'Unknown';
+  $ldap_status_class = 'bg-secondary';
+  try {
+    $test_ldap = @open_ldap_connection();
+    if ($test_ldap) {
+      $ldap_status = 'Connected';
+      $ldap_status_class = 'bg-success';
+      @ldap_close($test_ldap);
+    } else {
+      $ldap_status = 'Failed';
+      $ldap_status_class = 'bg-danger';
+    }
+  } catch (Exception $e) {
+    $ldap_status = 'Error: ' . $e->getMessage();
+    $ldap_status_class = 'bg-danger';
+  }
+
+  // Get loaded PHP extensions
+  $important_extensions = array(
+    'ldap' => 'LDAP',
+    'mbstring' => 'Multibyte String',
+    'openssl' => 'OpenSSL',
+    'session' => 'Session',
+    'json' => 'JSON',
+    'gd' => 'GD (Image)',
+    'curl' => 'cURL'
+  );
+  ?>
+
+  <div class="row">
+    <!-- Application Information -->
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-app-indicator"></i> Application</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tr>
+              <th style="width: 40%;">Luminary Version</th>
+              <td><span class="badge bg-primary"><?php echo htmlspecialchars($luminary_version); ?></span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHP Information -->
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-code-square"></i> PHP Runtime</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tr>
+              <th style="width: 40%;">PHP Version</th>
+              <td><span class="badge bg-info"><?php echo phpversion(); ?></span></td>
+            </tr>
+            <tr>
+              <th>Memory Limit</th>
+              <td><?php echo ini_get('memory_limit'); ?></td>
+            </tr>
+            <tr>
+              <th>Max Execution Time</th>
+              <td><?php echo ini_get('max_execution_time'); ?>s</td>
+            </tr>
+            <tr>
+              <th>Max Upload Size</th>
+              <td><?php echo ini_get('upload_max_filesize'); ?></td>
+            </tr>
+            <tr>
+              <th>Display Errors</th>
+              <td><span class="badge <?php echo ini_get('display_errors') ? 'bg-warning' : 'bg-success'; ?>">
+                <?php echo ini_get('display_errors') ? 'On' : 'Off'; ?>
+              </span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server Information -->
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-server"></i> Server</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tr>
+              <th style="width: 40%;">Server Software</th>
+              <td><?php echo htmlspecialchars($_SERVER['SERVER_SOFTWARE'] ?? 'Unknown'); ?></td>
+            </tr>
+            <tr>
+              <th>Operating System</th>
+              <td><?php echo php_uname('s') . ' ' . php_uname('r') . ' (' . php_uname('m') . ')'; ?></td>
+            </tr>
+            <tr>
+              <th>Hostname</th>
+              <td><?php echo htmlspecialchars(gethostname()); ?></td>
+            </tr>
+            <tr>
+              <th>Server Time</th>
+              <td><?php echo date('Y-m-d H:i:s T'); ?></td>
+            </tr>
+            <?php if ($disk_total) { ?>
+            <tr>
+              <th>Disk Usage</th>
+              <td>
+                <?php echo format_bytes($disk_used); ?> / <?php echo format_bytes($disk_total); ?>
+                <span class="badge <?php echo $disk_percent > 90 ? 'bg-danger' : ($disk_percent > 75 ? 'bg-warning' : 'bg-success'); ?>">
+                  <?php echo $disk_percent; ?>%
+                </span>
+              </td>
+            </tr>
+            <?php } ?>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LDAP Information -->
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-diagram-3"></i> LDAP Connection</h5>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tr>
+              <th style="width: 40%;">Server URI</th>
+              <td><code><?php echo htmlspecialchars($LDAP['uri'] ?? 'Not configured'); ?></code></td>
+            </tr>
+            <tr>
+              <th>Base DN</th>
+              <td><code><?php echo htmlspecialchars($LDAP['base_dn'] ?? 'Not configured'); ?></code></td>
+            </tr>
+            <tr>
+              <th>User Base DN</th>
+              <td><code><?php echo htmlspecialchars($LDAP['user_dn'] ?? 'Not configured'); ?></code></td>
+            </tr>
+            <tr>
+              <th>Connection Status</th>
+              <td><span class="badge <?php echo $ldap_status_class; ?>"><?php echo htmlspecialchars($ldap_status); ?></span></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHP Extensions -->
+    <div class="col-md-12 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="bi bi-puzzle"></i> PHP Extensions</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <?php foreach ($important_extensions as $ext => $display_name) {
+              $loaded = extension_loaded($ext);
+              $badge_class = $loaded ? 'bg-success' : 'bg-secondary';
+              $icon = $loaded ? 'check-circle' : 'x-circle';
+              echo '<div class="col-md-3 mb-2">';
+              echo '<i class="bi bi-' . $icon . '"></i> ';
+              echo '<span class="badge ' . $badge_class . '">' . htmlspecialchars($display_name) . '</span>';
+              echo '</div>';
+            } ?>
+          </div>
+          <div class="mt-3">
+            <small class="text-muted">
+              Total loaded extensions: <?php echo count(get_loaded_extensions()); ?>
+              <a href="#" onclick="document.getElementById('allExtensions').style.display='block'; this.style.display='none'; return false;" class="ms-2">Show all</a>
+            </small>
+            <div id="allExtensions" style="display: none;" class="mt-2">
+              <?php
+              $all_extensions = get_loaded_extensions();
+              sort($all_extensions);
+              foreach ($all_extensions as $ext) {
+                echo '<span class="badge bg-secondary me-1">' . htmlspecialchars($ext) . '</span> ';
+              }
+              ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>

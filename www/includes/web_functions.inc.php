@@ -242,6 +242,12 @@ function log_out($method='normal') {
  $filename = preg_replace('/[^a-zA-Z0-9]/','_', $USER_ID);
  @ unlink("/tmp/$filename");
 
+ // Audit log logout
+ if (function_exists('audit_log')) {
+  $logout_method = ($method == 'auto') ? 'automatic (timeout)' : 'manual';
+  audit_log('logout', $USER_ID, $logout_method, 'success', $USER_ID);
+ }
+
  if ($method == 'auto') { $options = "?logged_out"; } else { $options = ""; }
  header("Location:  //{$_SERVER["HTTP_HOST"]}{$SERVER_PATH}index.php$options\n\n");
 
@@ -377,6 +383,159 @@ function render_footer() {
 
 ######################################################
 
+function check_password_expiry_restriction($current_module) {
+
+ global $USER_ID, $PASSWORD_POLICY_ENABLED, $PPOLICY_ENABLED, $PASSWORD_EXPIRY_DAYS;
+ global $SERVER_PATH, $log_prefix, $SESSION_DEBUG, $LDAP;
+
+ // Only enforce if password policy and ppolicy are enabled, and expiry is configured
+ if ($PASSWORD_POLICY_ENABLED != TRUE || $PPOLICY_ENABLED != TRUE || $PASSWORD_EXPIRY_DAYS <= 0) {
+   return; // No password expiry restrictions
+ }
+
+ // Ensure password_policy_functions is loaded
+ if (!function_exists('password_policy_is_expired')) {
+   include_once "password_policy_functions.inc.php";
+   if (!function_exists('password_policy_is_expired')) {
+     // Can't check password expiry - allow access
+     return;
+   }
+ }
+
+ // Allow access to these modules regardless of password expiry status
+ $allowed_modules = array('change_password', 'log_out', 'log_in');
+ if (in_array($current_module, $allowed_modules)) {
+   return;
+ }
+
+ // Check if we already have password expiry info in session
+ $password_expired = isset($_SESSION['password_expired']) ? $_SESSION['password_expired'] : null;
+ $days_remaining = isset($_SESSION['password_days_remaining']) ? $_SESSION['password_days_remaining'] : null;
+
+ // If not in session or session data is stale (> 5 minutes), query LDAP
+ $session_time = isset($_SESSION['password_check_time']) ? $_SESSION['password_check_time'] : 0;
+ $cache_duration = 300; // 5 minutes
+
+ if ($password_expired === null || (time() - $session_time) > $cache_duration) {
+   // Connect to LDAP and check user's password expiry status
+   $ldap_connection = open_ldap_connection();
+   if (!$ldap_connection) {
+     // Can't check password expiry - allow access
+     return;
+   }
+
+   // Find user DN
+   $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+     "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+     array('dn'));
+
+   if ($user_search) {
+     $user_entry = ldap_get_entries($ldap_connection, $user_search);
+
+     if ($user_entry['count'] > 0) {
+       $user_dn = $user_entry[0]['dn'];
+
+       // Check if password is expired
+       $days_remaining = null;
+       $password_expired = password_policy_is_expired($ldap_connection, $user_dn, $days_remaining);
+       $should_warn = password_policy_should_warn($ldap_connection, $user_dn, $days_remaining);
+
+       // Store in session for caching
+       $_SESSION['password_expired'] = $password_expired;
+       $_SESSION['password_days_remaining'] = $days_remaining;
+       $_SESSION['password_should_warn'] = $should_warn;
+       $_SESSION['password_check_time'] = time();
+
+       if ($SESSION_DEBUG == TRUE) {
+         error_log("$log_prefix Password Expiry: User {$USER_ID} - expired={$password_expired}, days_remaining={$days_remaining}, should_warn={$should_warn}",0);
+       }
+     }
+   }
+
+   ldap_close($ldap_connection);
+ }
+
+ // If password is expired, force redirect to change_password
+ if ($password_expired === true) {
+   if ($SESSION_DEBUG == TRUE) {
+     error_log("$log_prefix Password Expiry: User {$USER_ID} has expired password - redirecting to change_password",0);
+   }
+   header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}change_password?password_expired\n\n");
+   exit(0);
+ }
+}
+
+
+######################################################
+
+function check_mfa_access_restriction($current_module) {
+
+ global $USER_ID, $MFA_FEATURE_ENABLED, $SERVER_PATH, $log_prefix, $SESSION_DEBUG;
+ global $LDAP, $TOTP_ATTRS, $MFA_REQUIRED_GROUPS;
+
+ // Only enforce if MFA features are operational
+ if ($MFA_FEATURE_ENABLED != TRUE) {
+   return; // No MFA restrictions
+ }
+
+ // Ensure totp_functions is loaded
+ if (!function_exists('totp_user_requires_mfa')) {
+   // Can't check MFA requirements without totp_functions - allow access
+   return;
+ }
+
+ // Allow access to these modules regardless of MFA status
+ $allowed_modules = array('manage_mfa', 'log_out', 'log_in');
+ if (in_array($current_module, $allowed_modules)) {
+   return;
+ }
+
+ // Connect to LDAP and check user's MFA status
+ $ldap_connection = open_ldap_connection();
+ if (!$ldap_connection) {
+   // Can't check MFA status - allow access
+   return;
+ }
+
+ $status_attr = $TOTP_ATTRS['status'];
+ $status_attr_lower = strtolower($status_attr);
+
+ $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+   "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+   array($status_attr, 'memberOf'));
+
+ if ($user_search) {
+   $user_entry = ldap_get_entries($ldap_connection, $user_search);
+
+   if ($user_entry['count'] > 0) {
+     $totp_status = isset($user_entry[0][$status_attr_lower][0]) ? $user_entry[0][$status_attr_lower][0] : 'none';
+
+     // If user doesn't have active MFA, check if it's required
+     if ($totp_status !== 'active') {
+       // Check if user requires MFA (is in an MFA-required group)
+       $mfa_result = totp_user_requires_mfa($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS);
+       ldap_close($ldap_connection);
+
+       if ($mfa_result['required']) {
+         // User requires MFA but doesn't have active status - redirect to MFA setup
+         if ($SESSION_DEBUG == TRUE) {
+           error_log("$log_prefix MFA: User {$USER_ID} requires MFA but status is '{$totp_status}' - redirecting to MFA setup",0);
+         }
+         header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}manage_mfa?mfa_required\n\n");
+         exit(0);
+       }
+       // else: User doesn't require MFA, allow access
+       return;
+     }
+     // else: User has active MFA, allow access
+   }
+ }
+
+ ldap_close($ldap_connection);
+}
+
+######################################################
+
 function set_page_access($level) {
 
  global $IS_ADMIN, $IS_SETUP_ADMIN, $VALIDATED, $log_prefix, $SESSION_DEBUG, $SESSION_TIMED_OUT, $SERVER_PATH;
@@ -401,6 +560,11 @@ function set_page_access($level) {
 
  if ($level == "admin") {
   if ($IS_ADMIN == TRUE and $VALIDATED == TRUE) {
+   // Check MFA access restrictions if LOGIN_REQUIRES_MFA is enabled
+   global $THIS_MODULE;
+   check_mfa_access_restriction($THIS_MODULE);
+   // Check password expiry restrictions
+   check_password_expiry_restriction($THIS_MODULE);
    return;
   }
   else {
@@ -412,6 +576,11 @@ function set_page_access($level) {
 
  if ($level == "user") {
   if ($VALIDATED == TRUE){
+   // Check MFA access restrictions if LOGIN_REQUIRES_MFA is enabled
+   global $THIS_MODULE;
+   check_mfa_access_restriction($THIS_MODULE);
+   // Check password expiry restrictions
+   check_password_expiry_restriction($THIS_MODULE);
    return;
   }
   else {

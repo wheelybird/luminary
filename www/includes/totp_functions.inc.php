@@ -395,29 +395,125 @@ function totp_disable($ldap_connection, $user_dn) {
 }
 
 /**
- * Check if user is in an MFA-required group
+ * Check if user is in a group that requires MFA (LDAP-based approach)
+ *
+ * Queries groups in LDAP for mfaRequired attribute. This allows dynamic
+ * MFA policy management without configuration changes.
  *
  * @param resource $ldap_connection LDAP connection resource
  * @param string $username Username to check
- * @param array $mfa_required_groups Array of group names requiring MFA
- * @return bool True if user is in an MFA-required group
+ * @return array Associative array with keys:
+ *   - 'required' (bool): Whether MFA is required
+ *   - 'grace_period' (int|null): Group-specific grace period or null for global default
+ *   - 'required_by_group' (string|null): Name of group requiring MFA
  */
-function totp_user_requires_mfa($ldap_connection, $username, $mfa_required_groups) {
-  if (empty($mfa_required_groups)) {
-    return false;
-  }
+function totp_user_requires_mfa_ldap($ldap_connection, $username) {
+  global $LDAP, $GROUP_MFA_ATTRS;
 
-  // Get user's groups using existing function that handles RFC2307bis
+  // Get user's groups (RFC2307bis-aware via existing function)
   $user_groups = ldap_user_group_membership($ldap_connection, $username);
 
-  // Check if user is member of any MFA-required group
-  foreach ($mfa_required_groups as $required_group) {
-    if (in_array($required_group, $user_groups)) {
-      return true;
+  if (empty($user_groups)) {
+    return array('required' => false, 'grace_period' => null, 'required_by_group' => null);
+  }
+
+  // Get attribute names from config
+  $mfa_required_attr = $GROUP_MFA_ATTRS['required'];
+  $mfa_grace_period_attr = $GROUP_MFA_ATTRS['grace_period'];
+  $mfa_required_attr_lower = strtolower($mfa_required_attr);
+  $mfa_grace_period_attr_lower = strtolower($mfa_grace_period_attr);
+
+  // Track all groups requiring MFA and their grace periods
+  $requiring_groups = array();
+  $shortest_grace_period = null;
+  $first_requiring_group = null;
+
+  // Check each group for MFA requirement
+  foreach ($user_groups as $group_name) {
+    // Query the group for MFA attributes
+    $group_filter = "({$LDAP['group_attribute']}=" . ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
+    $search = @ldap_search(
+      $ldap_connection,
+      $LDAP['group_dn'],
+      $group_filter,
+      array($mfa_required_attr, $mfa_grace_period_attr)
+    );
+
+    if ($search) {
+      $entry = ldap_get_entries($ldap_connection, $search);
+
+      if (isset($entry[0][$mfa_required_attr_lower][0])) {
+        // Check if mfaRequired is TRUE
+        if (strcasecmp($entry[0][$mfa_required_attr_lower][0], 'TRUE') == 0) {
+          $requiring_groups[] = $group_name;
+
+          // Track first requiring group for return value
+          if ($first_requiring_group === null) {
+            $first_requiring_group = $group_name;
+          }
+
+          // Get group-specific grace period if set
+          if (isset($entry[0][$mfa_grace_period_attr_lower][0])) {
+            $grace_period = intval($entry[0][$mfa_grace_period_attr_lower][0]);
+
+            // Keep track of shortest grace period (most restrictive)
+            if ($shortest_grace_period === null || $grace_period < $shortest_grace_period) {
+              $shortest_grace_period = $grace_period;
+            }
+          }
+        }
+      }
     }
   }
 
-  return false;
+  // If any groups require MFA, return the shortest grace period
+  if (!empty($requiring_groups)) {
+    return array(
+      'required' => true,
+      'grace_period' => $shortest_grace_period,
+      'required_by_group' => $first_requiring_group
+    );
+  }
+
+  return array('required' => false, 'grace_period' => null, 'required_by_group' => null);
+}
+
+/**
+ * Check if user is in an MFA-required group
+ *
+ * Primary method: Check LDAP groups for mfaRequired attribute
+ * Fallback method: Check against MFA_REQUIRED_GROUPS config (for testing/emergency)
+ *
+ * @param resource $ldap_connection LDAP connection resource
+ * @param string $username Username to check
+ * @param array $mfa_required_groups Optional array of group names (config fallback)
+ * @return array Associative array with keys:
+ *   - 'required' (bool): Whether MFA is required
+ *   - 'grace_period' (int|null): Group-specific grace period or null for global default
+ *   - 'required_by_group' (string|null): Name of group requiring MFA
+ */
+function totp_user_requires_mfa($ldap_connection, $username, $mfa_required_groups = array()) {
+  // Try LDAP-based approach first
+  $ldap_result = totp_user_requires_mfa_ldap($ldap_connection, $username);
+  if ($ldap_result['required']) {
+    return $ldap_result;
+  }
+
+  // Fall back to config-based approach if provided (for testing/emergency)
+  if (!empty($mfa_required_groups)) {
+    $user_groups = ldap_user_group_membership($ldap_connection, $username);
+    foreach ($mfa_required_groups as $required_group) {
+      if (in_array($required_group, $user_groups)) {
+        return array(
+          'required' => true,
+          'grace_period' => null,
+          'required_by_group' => $required_group
+        );
+      }
+    }
+  }
+
+  return array('required' => false, 'grace_period' => null, 'required_by_group' => null);
 }
 
 /**
@@ -477,9 +573,11 @@ function totp_get_user_mfa_status($ldap_connection, $username, $mfa_required_gro
   );
 
   // Check if user is in an MFA-required group
-  if (!empty($mfa_required_groups)) {
-    $status_data['requires_mfa'] = totp_user_requires_mfa($ldap_connection, $username, $mfa_required_groups);
-  }
+  $mfa_result = totp_user_requires_mfa($ldap_connection, $username, $mfa_required_groups);
+  $status_data['requires_mfa'] = $mfa_result['required'];
+
+  // Use group-specific grace period if available, otherwise use provided default
+  $effective_grace_period = $mfa_result['grace_period'] !== null ? $mfa_result['grace_period'] : $grace_period_days;
 
   // Get user's current MFA attributes
   $user_filter = "({$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ")";
@@ -492,7 +590,7 @@ function totp_get_user_mfa_status($ldap_connection, $username, $mfa_required_gro
       $status_data['enrolled_date'] = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_entry[0][$enrolled_attr_lower][0] : null;
 
       if ($status_data['enrolled_date']) {
-        $status_data['days_remaining'] = totp_grace_period_remaining($status_data['enrolled_date'], $grace_period_days);
+        $status_data['days_remaining'] = totp_grace_period_remaining($status_data['enrolled_date'], $effective_grace_period);
       }
     }
   }

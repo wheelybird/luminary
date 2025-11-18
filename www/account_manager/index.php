@@ -4,6 +4,8 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
 include_once "module_functions.inc.php";
 set_page_access("admin");
 
@@ -20,9 +22,13 @@ if (isset($_POST['delete_user'])) {
   $del_user = ldap_delete_account($ldap_connection,$this_user);
 
   if ($del_user) {
+    // Audit log user deletion
+    audit_log('user_deleted', $this_user, "User account deleted by admin", 'success', $USER_ID);
     render_alert_banner("User <strong>$this_user</strong> was deleted.");
   }
   else {
+    // Audit log failed deletion
+    audit_log('user_delete_failure', $this_user, "Failed to delete user account", 'failure', $USER_ID);
     render_alert_banner("User <strong>$this_user</strong> wasn't deleted.  See the logs for more information.","danger",15000);
   }
 

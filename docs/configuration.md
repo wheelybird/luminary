@@ -1,829 +1,1092 @@
 # Configuration Reference
 
-Luminary is configured entirely through environment variables. This document lists all available configuration options organised by category.
+This document provides a comprehensive reference for all configuration options in Luminary.
+
+**Note:** This documentation is auto-generated from the configuration registry.
+To update this file, run: `php docs/generate_config_docs.php`
 
 ## Table of Contents
-
-- [Mandatory Settings](#mandatory-settings)
-- [Web Server Settings](#web-server-settings)
-- [LDAP Settings](#ldap-settings)
-- [Advanced LDAP Settings](#advanced-ldap-settings)
-- [User Account Settings](#user-account-settings)
+- [LDAP Directory Settings](#ldap-directory-settings)
+- [User Account Defaults](#user-account-defaults)
 - [Multi-Factor Authentication](#multi-factor-authentication)
+- [User Profile Settings](#user-profile-settings)
 - [Email Settings](#email-settings)
-- [Account Request Settings](#account-request-settings)
-- [Appearance and Behaviour](#appearance-and-behaviour)
-- [Debugging](#debugging)
-
-## Mandatory Settings
-
-These variables must be set for Luminary to function:
-
-### `LDAP_URI`
-
-The URI of your LDAP server.
-
-**Examples:**
-- `ldap://ldap.example.com`
-- `ldaps://ldap.example.com:636`
-- `ldap://192.168.1.100:389`
-
-### `LDAP_BASE_DN`
-
-The base distinguished name for your LDAP directory. All users and groups will be created under this DN.
-
-**Example:** `dc=example,dc=com`
-
-### `LDAP_ADMIN_BIND_DN`
-
-The DN of an LDAP user with permission to modify all records under `LDAP_BASE_DN`. This is typically the admin user.
-
-**Example:** `cn=admin,dc=example,dc=com`
-
-### `LDAP_ADMIN_BIND_PWD`
-
-The password for the `LDAP_ADMIN_BIND_DN` user.
-
-**Security Note:** Consider using `LDAP_ADMIN_BIND_PWD_FILE` with Docker secrets instead of putting passwords directly in environment variables.
-
-### `LDAP_ADMINS_GROUP`
-
-**Default:** `admins`
-
-The name of the LDAP group whose members can access the user management interface.
-
-**Example:** `admins`
-
-**Note:** Members of this group have full access to create, modify, and delete user accounts and groups. This group is created automatically during the setup wizard.
+- [Interface & Branding](#interface-&-branding)
+- [Session & Security](#session-&-security)
+- [Audit Logging 🔧](#audit-logging)
+- [Password Policy 🔧](#password-policy)
+- [Account Lifecycle 🔧](#account-lifecycle)
+- [Advanced Group Management 🔧](#advanced-group-management)
+- [Debug & Logging](#debug-&-logging)
 
 ---
 
-## Web Server Settings
+## Legend
 
-Configuration for the web interface and HTTPS.
-
-### `SERVER_HOSTNAME`
-
-**Default:** `ldapusermanager.org`
-
-The hostname that the interface will be served from. This is used for generating URLs and SSL certificate generation.
-
-**Example:** `users.example.com`
-
-### `SERVER_PATH`
-
-**Default:** `/`
-
-The path to the user manager on the webserver. Useful when running behind a reverse proxy at a subpath.
-
-**Examples:**
-- `/ldap/` - Served at https://example.com/ldap/
-- `/users/` - Served at https://example.com/users/
-
-### `SERVER_PORT`
-
-**Default:** Listens on ports 80 and 443, with HTTP redirecting to HTTPS
-
-The port the webserver inside the container will listen on. When set, HTTP redirection is disabled and the server listens only on this port.
-
-**Usage:** Primarily for when using Docker's `--network=host` mode.
-
-**Examples:**
-- `8443` - Listen on port 8443 for HTTPS traffic
-- `8080` - Listen on port 8080 for HTTP traffic (requires `NO_HTTPS=TRUE`)
-
-### `NO_HTTPS`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to disable HTTPS and serve the interface over unencrypted HTTP.
-
-**Security Warning:** Only use this for testing. In production, always use HTTPS.
-
-### `SERVER_CERT_FILENAME` / `SERVER_KEY_FILENAME`
-
-**Defaults:** `server.crt` / `server.key`
-
-If you're providing your own SSL certificates (mounted into `/opt/ssl/`), specify the filenames here.
-
-**Example:**
-```bash
--v /path/to/certs:/opt/ssl \
--e SERVER_CERT_FILENAME=my-cert.crt \
--e SERVER_KEY_FILENAME=my-key.key
-```
-
-### `CA_CERT_FILENAME`
-
-If your certificate was signed by an intermediate CA, provide the CA certificate filename.
-
-**Example:** `ca-bundle.crt`
+- 🔧 = Optional feature (disabled by default)
+- ⚠️ = Mandatory configuration (must be set)
+- 📝 = Has default value
+- 🔢 = Array/list value
+- ✅ = Boolean value
 
 ---
 
-## LDAP Settings
+## LDAP Directory Settings
 
-### `LDAP_USER_OU`
+Connection settings and directory structure configuration
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| LDAP server URI<br><small>Format: ldap://hostname:port or ldaps://hostname:port</small> | string | ⚠️ *Required* | `LDAP_URI` | LDAP server URI |
+| LDAP base distinguished name<br><small>Example: dc=example,dc=com</small> | string | ⚠️ *Required* | `LDAP_BASE_DN` | LDAP base distinguished name |
+| Admin bind DN for LDAP operations<br><small>Full DN of admin account with write permissions</small> | string | ⚠️ *Required* | `LDAP_ADMIN_BIND_DN` | Admin bind DN for LDAP operations |
+| Admin bind password<br><small>Password for admin bind DN</small> | string | ⚠️ *Required* | `LDAP_ADMIN_BIND_PWD` | Admin bind password |
+| Organizational unit for user accounts<br><small>OU name only (without base DN)</small> | string | 📝 `people` | `LDAP_USER_OU` | Organizational unit for user accounts |
+| Organizational unit for groups<br><small>OU name only (without base DN)</small> | string | 📝 `groups` | `LDAP_GROUP_OU` | Organizational unit for groups |
+| Group name for administrators<br><small>Members of this group have admin access to Luminary</small> | string | 📝 `admins` | `LDAP_ADMINS_GROUP` | Group name for administrators |
+| Attribute used for user account identifier<br><small>Typically uid or cn</small> | string | 📝 `uid` | `LDAP_ACCOUNT_ATTRIBUTE` | Attribute used for user account identifier |
+| Attribute used for group identifier<br><small>Typically cn</small> | string | 📝 `cn` | `LDAP_GROUP_ATTRIBUTE` | Attribute used for group identifier |
+| Require StartTLS for LDAP connections<br><small>Encrypts connection to LDAP server</small> | ✅ boolean | `FALSE` | `LDAP_REQUIRE_STARTTLS` | Require StartTLS for LDAP connections |
+| Ignore TLS certificate validation errors<br><small>WARNING: Only use for development/testing</small> | ✅ boolean | `FALSE` | `LDAP_IGNORE_CERT_ERRORS` | Ignore TLS certificate validation errors |
+| Force RFC2307bis schema<br><small>Use groupOfNames instead of posixGroup</small> | ✅ boolean | `FALSE` | `FORCE_RFC2307BIS` | Force RFC2307bis schema |
+
+### Details
+
+#### LDAP server URI
+
+Format: ldap://hostname:port or ldaps://hostname:port
+
+**Environment Variable:** `LDAP_URI`
+
+---
+
+#### LDAP base distinguished name
+
+Example: dc=example,dc=com
+
+**Environment Variable:** `LDAP_BASE_DN`
+
+---
+
+#### Admin bind DN for LDAP operations
+
+Full DN of admin account with write permissions
+
+**Environment Variable:** `LDAP_ADMIN_BIND_DN`
+
+---
+
+#### Admin bind password
+
+Password for admin bind DN
+
+**Environment Variable:** `LDAP_ADMIN_BIND_PWD`
+
+---
+
+#### Organizational unit for user accounts
+
+OU name only (without base DN)
+
+**Environment Variable:** `LDAP_USER_OU`
 
 **Default:** `people`
 
-The name of the organisational unit where user accounts are stored.
+---
 
-**Full DN will be:** `ou=people,dc=example,dc=com`
+#### Organizational unit for groups
 
-### `LDAP_GROUP_OU`
+OU name only (without base DN)
+
+**Environment Variable:** `LDAP_GROUP_OU`
 
 **Default:** `groups`
 
-The name of the organisational unit where groups are stored.
+---
 
-**Full DN will be:** `ou=groups,dc=example,dc=com`
+#### Group name for administrators
 
-### `LDAP_REQUIRE_STARTTLS`
+Members of this group have admin access to Luminary
 
-**Default:** `FALSE`
+**Environment Variable:** `LDAP_ADMINS_GROUP`
 
-Set to `TRUE` to require StartTLS for LDAP connections. Recommended for security when using `ldap://` URIs.
-
-**Note:** Not needed when using `ldaps://` URIs which are already encrypted.
-
-### `LDAP_IGNORE_CERT_ERRORS`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to ignore SSL/TLS certificate validation errors.
-
-**Usage:** Useful for testing with self-signed certificates.
-
-**Security Warning:** Do not use in production. Disables certificate verification which protects against man-in-the-middle attacks.
-
-### `LDAP_TLS_CACERT`
-
-Provide a CA certificate to validate the LDAP server's certificate when using StartTLS or LDAPS.
-
-**Usage:** Set this to the contents of your CA certificate file (including BEGIN/END markers).
-
-**Example:**
-```bash
--e LDAP_TLS_CACERT="$(cat /path/to/ca-cert.pem)"
-```
-
-Or use a file:
-```bash
--e LDAP_TLS_CACERT_FILE=/run/secrets/ldap_ca_cert
-```
+**Default:** `admins`
 
 ---
 
-## Advanced LDAP Settings
+#### Attribute used for user account identifier
 
-### `LDAP_ACCOUNT_ATTRIBUTE`
+Typically uid or cn
+
+**Environment Variable:** `LDAP_ACCOUNT_ATTRIBUTE`
 
 **Default:** `uid`
 
-The attribute used to identify user accounts.
+---
 
-**Common values:**
-- `uid` - For standard POSIX accounts
-- `cn` - For some directory schemas
-- `sAMAccountName` - For Active Directory compatibility
+#### Attribute used for group identifier
 
-### `LDAP_GROUP_ATTRIBUTE`
+Typically cn
+
+**Environment Variable:** `LDAP_GROUP_ATTRIBUTE`
 
 **Default:** `cn`
 
-The attribute used to identify groups.
+---
 
-### `FORCE_RFC2307BIS`
+#### Require StartTLS for LDAP connections
 
-**Default:** Auto-detected
+Encrypts connection to LDAP server
 
-Set to `TRUE` to force RFC2307BIS schema mode, which allows for `memberOf` searches and enhanced group management.
+**Environment Variable:** `LDAP_REQUIRE_STARTTLS`
 
-**Usage:** Only set this if auto-detection fails.
-
-### `LDAP_GROUP_MEMBERSHIP_ATTRIBUTE`
-
-**Default:** Auto-detected based on RFC2307BIS
-
-The attribute used to define group membership.
-
-**Common values:**
-- `memberUid` - Standard RFC2307 (stores username)
-- `member` - RFC2307BIS (stores full DN)
-
-### `LDAP_GROUP_MEMBERSHIP_USES_UID`
-
-**Default:** Auto-detected
-
-Set to `TRUE` if group membership uses UIDs instead of full DNs.
-
-**Values:**
-- `TRUE` - memberUid stores usernames
-- `FALSE` - member stores full DNs
-
-### `LDAP_ACCOUNT_ADDITIONAL_OBJECTCLASSES`
-
-Add extra objectClasses when creating user accounts. Comma-separated list.
-
-**Example:** `mailAccount,customUser`
-
-See [Advanced Topics](advanced.md#extra-objectclasses) for more details.
-
-### `LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES`
-
-Add extra attributes when creating user accounts. JSON format.
-
-**Example:**
-```bash
--e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES='{"loginShell":"shell","homeDirectory":"text"}'
-```
-
-See [Advanced Topics](advanced.md#custom-attributes) for more details.
-
-### `LDAP_GROUP_ADDITIONAL_OBJECTCLASSES`
-
-Add extra objectClasses when creating groups. Comma-separated list.
-
-### `LDAP_GROUP_ADDITIONAL_ATTRIBUTES`
-
-Add extra attributes when creating groups. JSON format.
+**Default:** `FALSE`
 
 ---
 
-## User Account Settings
+#### Ignore TLS certificate validation errors
 
-### `DEFAULT_USER_GROUP`
+WARNING: Only use for development/testing
+
+**Environment Variable:** `LDAP_IGNORE_CERT_ERRORS`
+
+**Default:** `FALSE`
+
+---
+
+#### Force RFC2307bis schema
+
+Use groupOfNames instead of posixGroup
+
+**Environment Variable:** `FORCE_RFC2307BIS`
+
+**Default:** `FALSE`
+
+---
+
+
+## User Account Defaults
+
+Default values and behavior for new user accounts
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Default primary group for new users<br><small>Group name that new users will be added to</small> | string | 📝 `everybody` | `DEFAULT_USER_GROUP` | Default primary group for new users |
+| Default login shell for new users<br><small>Full path to shell binary</small> | string | 📝 `/bin/bash` | `DEFAULT_USER_SHELL` | Default login shell for new users |
+| Username format template<br><small>Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}</small> | string | 📝 `{first_name}-{last_name}` | `USERNAME_FORMAT` | Username format template |
+| Regular expression for username validation<br><small>Usernames must match this pattern</small> | string | 📝 `^[\p{L}\p{N}_.-]{2,64}$` | `USERNAME_REGEX` | Regular expression for username validation |
+| Enforce username validation rules<br><small>Validate usernames against USERNAME_REGEX</small> | ✅ boolean | `TRUE` | `ENFORCE_USERNAME_VALIDATION` | Enforce username validation rules |
+| Allow weak passwords<br><small>Skip password strength requirement (not recommended)</small> | ✅ boolean | `FALSE` | `ACCEPT_WEAK_PASSWORDS` | Allow weak passwords |
+| Show POSIX attributes in forms<br><small>Display UID, GID, home directory, shell fields</small> | ✅ boolean | `FALSE` | `SHOW_POSIX_ATTRIBUTES` | Show POSIX attributes in forms |
+| Password hash algorithm<br><small>Options: SHA, SSHA, SHA256, SHA512, ARGON2, etc.</small> | string | *Not set* | `PASSWORD_HASH` | Password hash algorithm |
+| Email domain for auto-generation<br><small>Domain used when auto-generating user email addresses</small> | string | *Not set* | `EMAIL_DOMAIN` | Email domain for auto-generation |
+
+### Details
+
+#### Default primary group for new users
+
+Group name that new users will be added to
+
+**Environment Variable:** `DEFAULT_USER_GROUP`
 
 **Default:** `everybody`
 
-The default group that new users are added to.
+---
 
-**Note:** This group will be created during setup if it doesn't exist.
+#### Default login shell for new users
 
-### `DEFAULT_USER_SHELL`
+Full path to shell binary
+
+**Environment Variable:** `DEFAULT_USER_SHELL`
 
 **Default:** `/bin/bash`
 
-The default login shell assigned to new user accounts.
+---
 
-**Common values:**
-- `/bin/bash`
-- `/bin/sh`
-- `/bin/zsh`
-- `/usr/sbin/nologin` - For accounts that shouldn't have shell access
+#### Username format template
 
-### `ENFORCE_USERNAME_VALIDATION`
+Template variables: {first_name}, {last_name}, {first_name_initial}, {last_name_initial}
 
-**Default:** `TRUE`
-
-Controls whether usernames and group names are validated against the `USERNAME_REGEX` pattern, and how the Common Name (CN) is formatted.
-
-**When TRUE:**
-- Usernames must match the `USERNAME_REGEX` pattern
-- CN is formatted without spaces and with accents removed (e.g., "Hæppy Testør" → "haeppytestor")
-- Validation errors shown if invalid characters used
-
-**When FALSE:**
-- Username validation is skipped (more permissive)
-- CN preserves spaces and Unicode (e.g., "Hæppy Testør" → "Hæppy Testør")
-
-**Important:** Usernames are ALWAYS converted to ASCII (regardless of this setting) to meet POSIX and LDAP requirements. This ensures compatibility with:
-- Home directories (RFC 2307 homeDirectory uses IA5String/ASCII)
-- Email addresses (LDAP mail attribute uses IA5String/ASCII only - see note below)
-- Filesystem paths and POSIX tools
-
-**LDAP Schema Unicode Limitations:**
-
-The following standard LDAP attributes use **IA5String syntax** (ASCII-only, codes 0-127):
-- `mail` (email address) - RFC 4524
-- `homeDirectory` (home path) - RFC 2307/2307bis
-- `uid` (username) - RFC 2307
-
-While modern standards exist (EAI for email/RFC 6531, UTF-8 filesystems for paths), **LDAP schema definitions remain ASCII-only** for these attributes. This is a schema constraint, not an OS limitation:
-
-- **Linux/Unix:** Modern filesystems (ext4, XFS, Btrfs) fully support UTF-8 paths like `/home/hæppy`
-- **Email Systems:** Modern MTAs support Unicode addresses via EAI (RFC 6531)
-- **LDAP Schema:** Still uses 1990s-era IA5String for compatibility
-
-**Alternative schemas exist** (like `intlMailAdr` for Unicode email) but aren't widely deployed. Active Directory has better Unicode support for some attributes, but still follows RFC standards for interoperability.
-
-**Display name attributes** (`cn`, `givenName`, `sn`) DO support Unicode via DirectoryString syntax - only technical identifiers (username, email, paths) are ASCII-restricted.
-
-This is why usernames are transliterated to ASCII: e.g., "hæppy@example.com" becomes "haeppy@example.com"
-
-**Examples:**
-- User "Hæppy Testør" → username `haeppy-testor` (always ASCII-safe)
-- With `TRUE`: CN = `haeppytestor`, validation enforced
-- With `FALSE`: CN = `Hæppy Testør`, validation skipped
-
-### `ENFORCE_SAFE_SYSTEM_NAMES`
-
-⚠️ **DEPRECATED** - Use `ENFORCE_USERNAME_VALIDATION` instead
-
-**Default:** `TRUE`
-
-This setting is maintained for backward compatibility only. It behaves identically to `ENFORCE_USERNAME_VALIDATION`.
-
-**Migration:** Replace `ENFORCE_SAFE_SYSTEM_NAMES` with `ENFORCE_USERNAME_VALIDATION` in your configuration. If both are set, `ENFORCE_USERNAME_VALIDATION` takes precedence.
-
-### `USERNAME_FORMAT`
+**Environment Variable:** `USERNAME_FORMAT`
 
 **Default:** `{first_name}-{last_name}`
 
-Template for auto-generating usernames from user details. Spaces and hyphens in names are automatically removed (e.g., Jean-Paul becomes jeanpaul).
+---
 
-**Available placeholders:**
-- `{first_name}` - User's full first name
-- `{first_name_initial}` - First letter of first name
-- `{last_name}` - User's full last name
-- `{last_name_initial}` - First letter of last name
+#### Regular expression for username validation
 
-**Examples:**
-- `{first_name}-{last_name}` → john-smith (default)
-- `{first_name}.{last_name}` → john.smith
-- `{first_name_initial}{last_name}` → jsmith
-- `{last_name}{first_name_initial}` → smithj
-- `{first_name_initial}{last_name_initial}` → js
-- `{first_name_initial}.{last_name}` → j.smith
+Usernames must match this pattern
 
-**Note:** All generated usernames are automatically converted to lowercase.
-
-### `USERNAME_REGEX`
+**Environment Variable:** `USERNAME_REGEX`
 
 **Default:** `^[\p{L}\p{N}_.-]{2,64}$`
 
-Regular expression for validating usernames and group names. Supports Unicode characters for international names.
+---
 
-**Pattern explanation:**
-- `\p{L}` - Any Unicode letter (supports international characters)
-- `\p{N}` - Any Unicode number
-- `_.-` - Underscore, period, and hyphen are allowed
-- `{2,64}` - Length between 2 and 64 characters
+#### Enforce username validation rules
 
-**Only used when:** `ENFORCE_USERNAME_VALIDATION=TRUE`
+Validate usernames against USERNAME_REGEX
 
-**Note:** This regex validates the format/length, but usernames are always converted to ASCII for POSIX/LDAP compatibility. For example, "José" passes this regex but becomes username "jose".
+**Environment Variable:** `ENFORCE_USERNAME_VALIDATION`
 
-### `PASSWORD_HASH`
-
-**Default:** `SSHA`
-
-The hashing algorithm used for passwords stored in LDAP.
-
-**Supported values:**
-- `SSHA` - Salted SHA-1 (recommended, widely compatible)
-- `SHA` - SHA-1 (less secure, no salt)
-- `MD5` - MD5 (deprecated)
-- `SSHA256` - Salted SHA-256 (more secure, may not work with all LDAP servers)
-- `SSHA512` - Salted SHA-512 (most secure, may not work with all LDAP servers)
-
-### `ACCEPT_WEAK_PASSWORDS`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to allow weak passwords that don't meet the strength requirements.
-
-**Security Warning:** Only use for testing. Always require strong passwords in production.
-
-### `SHOW_POSIX_ATTRIBUTES`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to show POSIX attributes (UID, GID, home directory, shell) in the user interface.
-
-**Usage:** Useful for administrators who need to see or modify these technical details.
+**Default:** `TRUE`
 
 ---
+
+#### Allow weak passwords
+
+Skip password strength requirement (not recommended)
+
+**Environment Variable:** `ACCEPT_WEAK_PASSWORDS`
+
+**Default:** `FALSE`
+
+---
+
+#### Show POSIX attributes in forms
+
+Display UID, GID, home directory, shell fields
+
+**Environment Variable:** `SHOW_POSIX_ATTRIBUTES`
+
+**Default:** `FALSE`
+
+---
+
+#### Password hash algorithm
+
+Options: SHA, SSHA, SHA256, SHA512, ARGON2, etc.
+
+**Environment Variable:** `PASSWORD_HASH`
+
+---
+
+#### Email domain for auto-generation
+
+Domain used when auto-generating user email addresses
+
+**Environment Variable:** `EMAIL_DOMAIN`
+
+---
+
 
 ## Multi-Factor Authentication
 
-MFA configuration options. See [MFA Documentation](mfa.md) for detailed setup instructions.
+TOTP/MFA configuration and enforcement policies
 
-### `MFA_ENABLED`
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable MFA/TOTP features<br><small>Requires TOTP schema to be installed in LDAP</small> | ✅ boolean | `FALSE` | `MFA_ENABLED` | Enable MFA/TOTP features |
+| Groups that require MFA enrollment<br><small>Comma-separated list of group names</small> | 🔢 array | `[]` (empty) | `MFA_REQUIRED_GROUPS` | Groups that require MFA enrollment |
+| Grace period for MFA enrollment<br><small>Days users have to set up MFA after being added to required group</small> | integer | 📝 `7` | `MFA_GRACE_PERIOD_DAYS` | Grace period for MFA enrollment |
+| TOTP issuer name<br><small>Displayed in authenticator apps (e.g., "Example Ltd VPN")</small> | string | 📝 `LDAP` | `MFA_TOTP_ISSUER` | TOTP issuer name |
+| LDAP attribute for TOTP secret<br><small>Only change if using custom schema</small> | string | 📝 `totpSecret` | `TOTP_SECRET_ATTRIBUTE` | LDAP attribute for TOTP secret |
+| LDAP attribute for MFA status<br><small>Values: none, pending, active, disabled</small> | string | 📝 `totpStatus` | `TOTP_STATUS_ATTRIBUTE` | LDAP attribute for MFA status |
+| LDAP attribute for enrollment date<br><small>Used for grace period calculation</small> | string | 📝 `totpEnrolledDate` | `TOTP_ENROLLED_DATE_ATTRIBUTE` | LDAP attribute for enrollment date |
+| LDAP attribute for backup codes<br><small>Multi-valued attribute for recovery codes</small> | string | 📝 `totpScratchCode` | `TOTP_SCRATCH_CODES_ATTRIBUTE` | LDAP attribute for backup codes |
+| LDAP objectClass for MFA users<br><small>Only change if using custom schema</small> | string | 📝 `totpUser` | `TOTP_OBJECTCLASS` | LDAP objectClass for MFA users |
+
+### Details
+
+#### Enable MFA/TOTP features
+
+Requires TOTP schema to be installed in LDAP
+
+**Environment Variable:** `MFA_ENABLED`
 
 **Default:** `FALSE`
 
-Set to `TRUE` to enable multi-factor authentication features.
+---
 
-**Requirements:** The [TOTP schema](https://github.com/wheelybird/ldap-totp-schema) must be installed in your LDAP directory.
+#### Groups that require MFA enrollment
 
-### `MFA_REQUIRED_GROUPS`
+Comma-separated list of group names
 
-**Default:** None
+**Environment Variable:** `MFA_REQUIRED_GROUPS`
 
-Comma-separated list of groups that require MFA. Users in these groups must enrol in MFA to access systems.
+**Default:** ``
 
-**Example:** `admins,developers,finance`
+---
 
-### `MFA_GRACE_PERIOD_DAYS`
+#### Grace period for MFA enrollment
+
+Days users have to set up MFA after being added to required group
+
+**Environment Variable:** `MFA_GRACE_PERIOD_DAYS`
 
 **Default:** `7`
 
-Number of days users have to enrol in MFA after being added to an MFA-required group. During this period they can still access systems.
-
-**Example:** `14` - Give users 14 days to set up MFA
-
-### `MFA_TOTP_ISSUER`
-
-**Default:** `$ORGANISATION_NAME`
-
-The issuer name displayed in authenticator apps when users scan the QR code.
-
-**Example:** `Example Ltd VPN`
-
-### `TOTP_SECRET_ATTRIBUTE`
-
-**Default:** `totpSecret`
-
-LDAP attribute name for storing TOTP secrets. Only change if using a custom schema.
-
-### `TOTP_STATUS_ATTRIBUTE`
-
-**Default:** `totpStatus`
-
-LDAP attribute name for storing MFA status (none/pending/active/disabled).
-
-### `TOTP_ENROLLED_DATE_ATTRIBUTE`
-
-**Default:** `totpEnrolledDate`
-
-LDAP attribute name for storing MFA enrolment date.
-
-### `TOTP_SCRATCH_CODES_ATTRIBUTE`
-
-**Default:** `totpScratchCode`
-
-LDAP attribute name for storing backup codes.
-
-### `TOTP_OBJECTCLASS`
-
-**Default:** `totpUser`
-
-LDAP objectClass name for users with MFA. Only change if using a custom schema.
-
 ---
 
-## User Profile Settings
+#### TOTP issuer name
 
-Configuration for the self-service user profile module, which allows users to edit their own LDAP attributes.
+Displayed in authenticator apps (e.g., "Example Ltd VPN")
 
-### `USER_EDITABLE_ATTRIBUTES`
-
-**Default:** None (uses built-in safe defaults)
-
-Comma-separated list of additional LDAP attributes that users can edit in their profile. These are merged with the built-in safe defaults.
-
-**Built-in editable attributes** (always available):
-- `telephoneNumber` - Telephone Number
-- `mobile` - Mobile Number
-- `displayName` - Display Name
-- `description` - About Me (textarea)
-- `title` - Job Title
-- `jpegPhoto` - Profile Photo (JPEG only, max 500KB)
-- `sshPublicKey` - SSH Public Keys (multi-valued)
-
-**Format:**
-```
-attribute:Label:Default:InputType
-```
-
-Where:
-- `attribute` - LDAP attribute name (required)
-- `Label` - Display label in the form (optional, defaults to attribute name)
-- `Default` - Default value when creating entries (optional)
-- `InputType` - Form input type (optional, defaults to `text`)
-
-**Supported input types:**
-- `text` - Single-line text input (default)
-- `textarea` - Multi-line text area (for descriptions, notes)
-- `tel` - Telephone number input (mobile keyboard support)
-- `email` - Email address input (with validation)
-- `url` - URL input (with validation)
-- `checkbox` - Boolean checkbox (TRUE/FALSE values)
-- `multipleinput` - Multiple values with + button
-- `binary` - File upload (for images, certificates)
-
-**Suffix shortcuts** (alternative to InputType parameter):
-- `attribute+` - Multi-valued attribute (same as `:multipleinput`)
-- `attribute^` - Binary/file upload (same as `:binary`)
-
-**Examples:**
-```bash
-# Simple attribute with default label
-USER_EDITABLE_ATTRIBUTES="personalTitle"
-
-# Attribute with custom label
-USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title"
-
-# Multiple attributes
-USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,office:Office Location,bio:Biography::textarea"
-
-# Telephone with specific input type
-USER_EDITABLE_ATTRIBUTES="workPhone:Work Phone::tel"
-
-# Multi-valued attribute using suffix
-USER_EDITABLE_ATTRIBUTES="sshPublicKey+"
-
-# File upload using suffix
-USER_EDITABLE_ATTRIBUTES="avatar:Profile Picture^"
-
-# Mix of formats
-USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,bio:Biography::textarea,sshPublicKey+,avatar^"
-```
-
-**Security:**
-
-A **security blacklist** prevents users from editing critical system attributes, regardless of this configuration:
-
-**Blacklisted attributes** (cannot be user-edited):
-- **System identifiers:** `dn`, `uid`, `cn`, `objectClass`
-- **POSIX attributes:** `uidNumber`, `gidNumber`, `homeDirectory`, `loginShell`
-- **Security:** `userPassword`, `sambaNTPassword`, `sambaPassword`
-- **Group membership:** `memberOf`, `member`, `memberUid`, `uniqueMember`
-- **MFA/TOTP:** `totpSecret`, `totpStatus`, `totpEnrolledDate`, `totpScratchCode`
-- **Structural:** `creatorsName`, `createTimestamp`, `modifiersName`, `modifyTimestamp`, `entryDN`, `entryUUID`
-
-Attempts to edit blacklisted attributes will be logged and rejected.
-
-**Example configurations:**
-
-```bash
-# Allow users to edit their biography and office location
-USER_EDITABLE_ATTRIBUTES="bio:Biography::textarea,office:Office Location"
-
-# Add SSH public keys (multi-valued)
-USER_EDITABLE_ATTRIBUTES="sshPublicKey+"
-
-# Extended profile with multiple field types
-USER_EDITABLE_ATTRIBUTES="personalTitle:Job Title,office:Office,bio:About Me::textarea,website:Website::url,availableForChat:Available::checkbox"
-
-# For organizations with custom LDAP schema
-USER_EDITABLE_ATTRIBUTES="employeeID:Employee ID,costCenter:Cost Center,projectCode:Current Project"
-```
-
-**Photo Upload Validation:**
-
-The `jpegPhoto` attribute has special validation:
-- **File type:** Must be a valid JPEG image (verified by MIME type and image content)
-- **File size:** Maximum 500KB (to ensure LDAP performance)
-- **Format:** Binary data stored directly in LDAP
-
-Users attempting to upload non-JPEG files or files larger than 500KB will see an error message.
-
-**Access Control:**
-
-The user profile module is available to **all authenticated users** (not just admins). Users can only:
-- View and edit their own profile
-- Modify attributes that pass the security blacklist check
-- Update attributes configured in `USER_EDITABLE_ATTRIBUTES` plus the built-in safe defaults
-
-Administrators can use the Account Manager module for full control over all user attributes.
-
-**System Configuration Page:**
-
-Administrators can view the complete system configuration by navigating to **System Config** from the main menu. This page displays:
-- All configuration values with defaults highlighted
-- LDAP directory settings
-- MFA/TOTP configuration
-- User profile editable attributes (default and admin-configured)
-- Email settings
-- Security and session settings
-- Active debug modes (with warnings)
-
-Values that differ from defaults are highlighted with blue badges, making it easy to see what has been customized.
-
----
-
-## Email Settings
-
-Configuration for sending email notifications. See [Advanced Topics](advanced.md#sending-emails) for setup details.
-
-### `SMTP_HOSTNAME`
-
-The hostname of your SMTP server.
-
-**Example:** `smtp.gmail.com`
-
-**Note:** Email features are disabled if this is not set.
-
-### `SMTP_HOST_PORT`
-
-**Default:** `25`
-
-The port your SMTP server listens on.
-
-**Common values:**
-- `25` - Standard SMTP
-- `587` - SMTP with StartTLS (recommended)
-- `465` - SMTPS (SMTP over SSL)
-
-### `SMTP_USERNAME`
-
-Username for SMTP authentication. Leave unset if your SMTP server doesn't require authentication.
-
-### `SMTP_PASSWORD`
-
-Password for SMTP authentication.
-
-**Security Note:** Consider using `SMTP_PASSWORD_FILE` with Docker secrets.
-
-### `SMTP_USE_TLS`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to use StartTLS encryption.
-
-**Recommended** for security when using port 587.
-
-### `SMTP_USE_SSL`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to use SSL/TLS encryption.
-
-**Usage:** Typically used with port 465.
-
-**Note:** Don't set both `SMTP_USE_TLS` and `SMTP_USE_SSL` to TRUE.
-
-### `SMTP_HELO_HOST`
-
-The hostname to use in the SMTP HELO command. Usually auto-detected.
-
-### `EMAIL_DOMAIN`
-
-The domain for auto-generating email addresses when creating accounts.
-
-**Example:** `example.com`
-
-**Usage:** If set and a user's email address is blank, it will be generated as `username@example.com`.
-
-**Note:** Email addresses are always ASCII-only due to LDAP schema constraints. Usernames are transliterated to ASCII before generating email addresses. See the [Email Address Encoding](#enforce_username_validation) note for details.
-
-### `EMAIL_FROM_ADDRESS`
-
-**Default:** `admin@$EMAIL_DOMAIN`
-
-The "From" address for emails sent by the system.
-
-**Example:** `noreply@example.com`
-
-### `EMAIL_FROM_NAME`
-
-**Default:** `$SITE_NAME`
-
-The "From" name for emails sent by the system.
-
-**Example:** `Example Ltd User Management`
-
----
-
-## Account Request Settings
-
-Allow users to request accounts via a web form.
-
-### `ACCOUNT_REQUESTS_ENABLED`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to enable the account request form.
-
-**Requirements:** Email must be configured (`SMTP_HOSTNAME` must be set).
-
-### `ACCOUNT_REQUESTS_EMAIL`
-
-**Default:** `$EMAIL_FROM_ADDRESS`
-
-The email address where account requests are sent.
-
-**Example:** `admins@example.com`
-
----
-
-## Appearance and Behaviour
-
-### `ORGANISATION_NAME`
+**Environment Variable:** `MFA_TOTP_ISSUER`
 
 **Default:** `LDAP`
 
-Your organisation's name, displayed throughout the interface.
+---
 
-**Example:** `Example Ltd`
+#### LDAP attribute for TOTP secret
 
-### `SITE_NAME`
+Only change if using custom schema
 
-**Default:** `$ORGANISATION_NAME user manager`
+**Environment Variable:** `TOTP_SECRET_ATTRIBUTE`
 
-The name of the website, shown in the page title and header.
+**Default:** `totpSecret`
 
-**Example:** `Example Ltd Account Manager`
+---
 
-### `SITE_LOGIN_LDAP_ATTRIBUTE`
+#### LDAP attribute for MFA status
 
-**Default:** `$LDAP_ACCOUNT_ATTRIBUTE`
+Values: none, pending, active, disabled
 
-The LDAP attribute users enter when logging in.
+**Environment Variable:** `TOTP_STATUS_ATTRIBUTE`
 
-**Usage:** Typically the same as `LDAP_ACCOUNT_ATTRIBUTE`, but can be different (e.g., allow login with email address).
+**Default:** `totpStatus`
 
-### `SITE_LOGIN_FIELD_LABEL`
+---
+
+#### LDAP attribute for enrollment date
+
+Used for grace period calculation
+
+**Environment Variable:** `TOTP_ENROLLED_DATE_ATTRIBUTE`
+
+**Default:** `totpEnrolledDate`
+
+---
+
+#### LDAP attribute for backup codes
+
+Multi-valued attribute for recovery codes
+
+**Environment Variable:** `TOTP_SCRATCH_CODES_ATTRIBUTE`
+
+**Default:** `totpScratchCode`
+
+---
+
+#### LDAP objectClass for MFA users
+
+Only change if using custom schema
+
+**Environment Variable:** `TOTP_OBJECTCLASS`
+
+**Default:** `totpUser`
+
+---
+
+
+## User Profile Settings
+
+Self-service user profile and editable attributes
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Built-in user-editable attributes<br><small>Default set of attributes users can safely edit</small> | 🔢 array | `telephonenumber`, `mobile`, `displayname`, ... | - | Built-in user-editable attributes |
+| Additional user-editable attributes<br><small>Comma-separated list of LDAP attributes users can edit</small> | 🔢 array | `[]` (empty) | `USER_EDITABLE_ATTRIBUTES` | Additional user-editable attributes |
+| Security blacklist of non-editable attributes<br><small>Attributes that users must NEVER be allowed to edit</small> | 🔢 array | `dn`, `uid`, `cn`, ... | - | Security blacklist of non-editable attributes |
+
+### Details
+
+#### Built-in user-editable attributes
+
+Default set of attributes users can safely edit
+
+**Default:** `telephonenumber, mobile, displayname, description, title, jpegphoto, sshpublickey`
+
+---
+
+#### Additional user-editable attributes
+
+Comma-separated list of LDAP attributes users can edit
+
+**Environment Variable:** `USER_EDITABLE_ATTRIBUTES`
+
+**Default:** ``
+
+---
+
+#### Security blacklist of non-editable attributes
+
+Attributes that users must NEVER be allowed to edit
+
+**Default:** `dn, uid, cn, objectclass, uidnumber, gidnumber, homedirectory, loginshell, userpassword, sambantpassword, sambapassword, memberof, member, memberuid, uniquemember, totpsecret, totpstatus, totpenrolleddate, totpscratchcode, creatorsname, createtimestamp, modifiersname, modifytimestamp, entrydn, entryuuid, structuralobjectclass, hassubordinates, subschemasubentry`
+
+---
+
+
+## Email Settings
+
+SMTP configuration and email notifications
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| SMTP server hostname<br><small>Email features disabled if not set</small> | string | *Not set* | `SMTP_HOSTNAME` | SMTP server hostname |
+| SMTP server port<br><small>Common: 25 (SMTP), 587 (StartTLS), 465 (SSL)</small> | integer | 📝 `25` | `SMTP_HOST_PORT` | SMTP server port |
+| SMTP authentication username<br><small>Leave unset if no authentication required</small> | string | *Not set* | `SMTP_USERNAME` | SMTP authentication username |
+| SMTP authentication password<br><small>Consider using SMTP_PASSWORD_FILE with Docker secrets</small> | string | *Not set* | `SMTP_PASSWORD` | SMTP authentication password |
+| Use StartTLS for SMTP<br><small>Recommended for port 587</small> | ✅ boolean | `FALSE` | `SMTP_USE_TLS` | Use StartTLS for SMTP |
+| Use SSL for SMTP<br><small>For port 465 (mutually exclusive with TLS)</small> | ✅ boolean | `FALSE` | `SMTP_USE_SSL` | Use SSL for SMTP |
+| SMTP HELO hostname<br><small>Hostname to use in HELO/EHLO command</small> | string | *Not set* | `SMTP_HELO_HOST` | SMTP HELO hostname |
+| From email address<br><small>Email address for outgoing messages</small> | string | 📝 `admin@luminary.id` | `EMAIL_FROM_ADDRESS` | From email address |
+| From name for emails<br><small>Display name for outgoing messages</small> | string | 📝 `Luminary` | `EMAIL_FROM_NAME` | From name for emails |
+| Enable account request feature<br><small>Requires SMTP to be configured</small> | ✅ boolean | `FALSE` | `ACCOUNT_REQUESTS_ENABLED` | Enable account request feature |
+| Email for account requests<br><small>Where account request notifications are sent</small> | string | 📝 `admin@luminary.id` | `ACCOUNT_REQUESTS_EMAIL` | Email for account requests |
+
+### Details
+
+#### SMTP server hostname
+
+Email features disabled if not set
+
+**Environment Variable:** `SMTP_HOSTNAME`
+
+---
+
+#### SMTP server port
+
+Common: 25 (SMTP), 587 (StartTLS), 465 (SSL)
+
+**Environment Variable:** `SMTP_HOST_PORT`
+
+**Default:** `25`
+
+---
+
+#### SMTP authentication username
+
+Leave unset if no authentication required
+
+**Environment Variable:** `SMTP_USERNAME`
+
+---
+
+#### SMTP authentication password
+
+Consider using SMTP_PASSWORD_FILE with Docker secrets
+
+**Environment Variable:** `SMTP_PASSWORD`
+
+---
+
+#### Use StartTLS for SMTP
+
+Recommended for port 587
+
+**Environment Variable:** `SMTP_USE_TLS`
+
+**Default:** `FALSE`
+
+---
+
+#### Use SSL for SMTP
+
+For port 465 (mutually exclusive with TLS)
+
+**Environment Variable:** `SMTP_USE_SSL`
+
+**Default:** `FALSE`
+
+---
+
+#### SMTP HELO hostname
+
+Hostname to use in HELO/EHLO command
+
+**Environment Variable:** `SMTP_HELO_HOST`
+
+---
+
+#### From email address
+
+Email address for outgoing messages
+
+**Environment Variable:** `EMAIL_FROM_ADDRESS`
+
+**Default:** `admin@luminary.id`
+
+---
+
+#### From name for emails
+
+Display name for outgoing messages
+
+**Environment Variable:** `EMAIL_FROM_NAME`
+
+**Default:** `Luminary`
+
+---
+
+#### Enable account request feature
+
+Requires SMTP to be configured
+
+**Environment Variable:** `ACCOUNT_REQUESTS_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Email for account requests
+
+Where account request notifications are sent
+
+**Environment Variable:** `ACCOUNT_REQUESTS_EMAIL`
+
+**Default:** `admin@luminary.id`
+
+---
+
+
+## Interface & Branding
+
+Customization, branding, and user interface settings
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Organization name<br><small>Displayed throughout the interface</small> | string | 📝 `Luminary` | `ORGANISATION_NAME` | Organization name |
+| Site name<br><small>Displayed in page titles and navigation</small> | string | 📝 `Luminary` | `SITE_NAME` | Site name |
+| Server hostname<br><small>Hostname used in URLs</small> | string | 📝 `luminary.id` | `SERVER_HOSTNAME` | Server hostname |
+| Server path<br><small>Base path for the application (e.g., /luminary/)</small> | string | 📝 `/` | `SERVER_PATH` | Server path |
+| Login field label<br><small>Label for login form username field</small> | string | 📝 `Username` | `SITE_LOGIN_FIELD_LABEL` | Login field label |
+| LDAP attribute for login<br><small>Which attribute to use for login authentication</small> | string | 📝 `uid` | `SITE_LOGIN_LDAP_ATTRIBUTE` | LDAP attribute for login |
+| Custom logo path<br><small>Path to custom logo file</small> | string | `FALSE` | `CUSTOM_LOGO` | Custom logo path |
+| Custom CSS path<br><small>Path to custom stylesheet</small> | string | `FALSE` | `CUSTOM_STYLES` | Custom CSS path |
+
+### Details
+
+#### Organization name
+
+Displayed throughout the interface
+
+**Environment Variable:** `ORGANISATION_NAME`
+
+**Default:** `Luminary`
+
+---
+
+#### Site name
+
+Displayed in page titles and navigation
+
+**Environment Variable:** `SITE_NAME`
+
+**Default:** `Luminary`
+
+---
+
+#### Server hostname
+
+Hostname used in URLs
+
+**Environment Variable:** `SERVER_HOSTNAME`
+
+**Default:** `luminary.id`
+
+---
+
+#### Server path
+
+Base path for the application (e.g., /luminary/)
+
+**Environment Variable:** `SERVER_PATH`
+
+**Default:** `/`
+
+---
+
+#### Login field label
+
+Label for login form username field
+
+**Environment Variable:** `SITE_LOGIN_FIELD_LABEL`
 
 **Default:** `Username`
 
-The label for the login field on the login page.
+---
 
-**Examples:**
-- `Email Address` - If users log in with email
-- `Employee ID` - If using employee IDs
+#### LDAP attribute for login
 
-### `SESSION_TIMEOUT`
+Which attribute to use for login authentication
+
+**Environment Variable:** `SITE_LOGIN_LDAP_ATTRIBUTE`
+
+**Default:** `uid`
+
+---
+
+#### Custom logo path
+
+Path to custom logo file
+
+**Environment Variable:** `CUSTOM_LOGO`
+
+**Default:** `FALSE`
+
+---
+
+#### Custom CSS path
+
+Path to custom stylesheet
+
+**Environment Variable:** `CUSTOM_STYLES`
+
+**Default:** `FALSE`
+
+---
+
+
+## Session & Security
+
+Session management and security settings
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Session timeout in minutes<br><small>Inactive sessions will be logged out</small> | integer | 📝 `10` | `SESSION_TIMEOUT` | Session timeout in minutes |
+| Disable HTTPS redirect<br><small>WARNING: Only use for development/testing</small> | ✅ boolean | `FALSE` | `NO_HTTPS` | Disable HTTPS redirect |
+| Enable HTTP header authentication<br><small>Login using HTTP headers (e.g., from reverse proxy)</small> | ✅ boolean | `FALSE` | `REMOTE_HTTP_HEADERS_LOGIN` | Enable HTTP header authentication |
+
+### Details
+
+#### Session timeout in minutes
+
+Inactive sessions will be logged out
+
+**Environment Variable:** `SESSION_TIMEOUT`
 
 **Default:** `10`
 
-Number of minutes of inactivity before users are automatically logged out.
+---
 
-**Example:** `30` - 30-minute timeout
+#### Disable HTTPS redirect
 
-### `CUSTOM_LOGO`
+WARNING: Only use for development/testing
 
-Path to a custom logo image to replace the default logo.
-
-**Usage:** Mount your logo file and set this to the path inside the container.
-
-**Example:**
-```bash
--v /path/to/logo.png:/custom/logo.png \
--e CUSTOM_LOGO=/custom/logo.png
-```
-
-### `CUSTOM_STYLES`
-
-Path to a custom CSS file for additional styling.
-
-**Example:**
-```bash
--v /path/to/custom.css:/custom/styles.css \
--e CUSTOM_STYLES=/custom/styles.css
-```
-
-### `REMOTE_HTTP_HEADERS_LOGIN`
+**Environment Variable:** `NO_HTTPS`
 
 **Default:** `FALSE`
-
-Set to `TRUE` to enable authentication via HTTP headers (e.g., when behind an authenticating reverse proxy).
-
-**Security Warning:** Only use when the proxy is properly configured to set authentication headers.
 
 ---
 
-## Debugging
+#### Enable HTTP header authentication
 
-### `LDAP_DEBUG`
+Login using HTTP headers (e.g., from reverse proxy)
 
-**Default:** `FALSE`
-
-Set to `TRUE` to enable verbose LDAP debugging output.
-
-**Usage:** Helpful when troubleshooting LDAP connection or search issues. Logs will show detailed LDAP operations.
-
-### `LDAP_VERBOSE_CONNECTION_LOGS`
+**Environment Variable:** `REMOTE_HTTP_HEADERS_LOGIN`
 
 **Default:** `FALSE`
-
-Set to `TRUE` for even more detailed LDAP connection logging.
-
-### `SESSION_DEBUG`
-
-**Default:** `FALSE`
-
-Set to `TRUE` to enable PHP session debugging.
-
-### `SMTP_LOG_LEVEL`
-
-**Default:** `0` (no logging)
-
-SMTP debug logging level.
-
-**Values:**
-- `0` - No output
-- `1` - Client commands
-- `2` - Client commands and responses
-- `3` - Connection and authentication details
-- `4` - Low-level data output
 
 ---
 
-## Using Docker Secrets
 
-For sensitive configuration values like passwords, you can use Docker secrets or file-based configuration:
+## Audit Logging 🔧
 
-```bash
-echo "my-ldap-password" | docker secret create ldap_admin_pwd -
+Audit trail and activity logging configuration (Optional)
 
-docker service create \
-  --secret ldap_admin_pwd \
-  -e LDAP_ADMIN_BIND_PWD_FILE=/run/secrets/ldap_admin_pwd \
-  wheelybird/luminary
+> **Note:** This is an optional feature. Set `AUDIT_ENABLED=TRUE` to enable.
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable audit logging<br><small>Log all administrative actions to audit trail</small> | ✅ boolean | `FALSE` | `AUDIT_ENABLED` | Enable audit logging |
+| Audit log file path<br><small>Full path to audit log file</small> | string | 📝 `/var/log/luminary/audit.log` | `AUDIT_LOG_FILE` | Audit log file path |
+| Audit log retention period<br><small>Number of days to keep audit logs</small> | integer | 📝 `90` | `AUDIT_LOG_RETENTION_DAYS` | Audit log retention period |
+
+### Details
+
+#### Enable audit logging
+
+Log all administrative actions to audit trail
+
+**Environment Variable:** `AUDIT_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Audit log file path
+
+Full path to audit log file
+
+**Environment Variable:** `AUDIT_LOG_FILE`
+
+**Default:** `/var/log/luminary/audit.log`
+
+---
+
+#### Audit log retention period
+
+Number of days to keep audit logs
+
+**Environment Variable:** `AUDIT_LOG_RETENTION_DAYS`
+
+**Default:** `90`
+
+---
+
+
+## Password Policy 🔧
+
+Password complexity and expiration policies (Optional)
+
+> **Note:** This is an optional feature. Set `PASSWORD_POLICY_ENABLED=TRUE` to enable.
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable password policy enforcement<br><small>Server-side validation of password requirements</small> | ✅ boolean | `FALSE` | `PASSWORD_POLICY_ENABLED` | Enable password policy enforcement |
+| Enable OpenLDAP ppolicy overlay integration<br><small>Use ppolicy for self-service password changes (requires STARTTLS/LDAPS)</small> | ✅ boolean | `FALSE` | `PPOLICY_ENABLED` | Enable OpenLDAP ppolicy overlay integration |
+| Minimum password length<br><small>Minimum number of characters required</small> | integer | 📝 `8` | `PASSWORD_MIN_LENGTH` | Minimum password length |
+| Require uppercase letters<br><small>Password must contain at least one uppercase letter</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_UPPERCASE` | Require uppercase letters |
+| Require lowercase letters<br><small>Password must contain at least one lowercase letter</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_LOWERCASE` | Require lowercase letters |
+| Require numbers<br><small>Password must contain at least one number</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_NUMBERS` | Require numbers |
+| Require special characters<br><small>Password must contain at least one special character</small> | ✅ boolean | `FALSE` | `PASSWORD_REQUIRE_SPECIAL` | Require special characters |
+| Minimum password strength score<br><small>Minimum score from 0-4 (from existing strength checker)</small> | integer | 📝 `3` | `PASSWORD_MIN_SCORE` | Minimum password strength score |
+| Password history count<br><small>Number of previous passwords to check (0=disabled)</small> | integer | 📝 `0` | `PASSWORD_HISTORY_COUNT` | Password history count |
+| Password expiry days<br><small>Days until password expires (0=never)</small> | integer | 📝 `0` | `PASSWORD_EXPIRY_DAYS` | Password expiry days |
+| Password expiry warning period<br><small>Days before expiry to show warning</small> | integer | 📝 `7` | `PASSWORD_EXPIRY_WARNING_DAYS` | Password expiry warning period |
+
+### Details
+
+#### Enable password policy enforcement
+
+Server-side validation of password requirements
+
+**Environment Variable:** `PASSWORD_POLICY_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Enable OpenLDAP ppolicy overlay integration
+
+When enabled, self-service password changes use Password Modify Extended Operation to allow ppolicy overlay to enforce password history and expiry. Requires STARTTLS or LDAPS to be enabled for security. Only applies to self-service password changes, not admin changes.
+
+**Environment Variable:** `PPOLICY_ENABLED`
+
+**Default:** `FALSE`
+
+**Security Note:** This feature requires a secure LDAP connection (STARTTLS or LDAPS) because the user's cleartext password must be sent to OpenLDAP for ppolicy enforcement. If TLS is not available, password changes will fail with a system configuration error.
+
+---
+
+#### Minimum password length
+
+Minimum number of characters required
+
+**Environment Variable:** `PASSWORD_MIN_LENGTH`
+
+**Default:** `8`
+
+---
+
+#### Require uppercase letters
+
+Password must contain at least one uppercase letter
+
+**Environment Variable:** `PASSWORD_REQUIRE_UPPERCASE`
+
+**Default:** `TRUE`
+
+---
+
+#### Require lowercase letters
+
+Password must contain at least one lowercase letter
+
+**Environment Variable:** `PASSWORD_REQUIRE_LOWERCASE`
+
+**Default:** `TRUE`
+
+---
+
+#### Require numbers
+
+Password must contain at least one number
+
+**Environment Variable:** `PASSWORD_REQUIRE_NUMBERS`
+
+**Default:** `TRUE`
+
+---
+
+#### Require special characters
+
+Password must contain at least one special character
+
+**Environment Variable:** `PASSWORD_REQUIRE_SPECIAL`
+
+**Default:** `FALSE`
+
+---
+
+#### Minimum password strength score
+
+Minimum score from 0-4 (from existing strength checker)
+
+**Environment Variable:** `PASSWORD_MIN_SCORE`
+
+**Default:** `3`
+
+---
+
+#### Password history count
+
+Number of previous passwords to check (0=disabled)
+
+**Environment Variable:** `PASSWORD_HISTORY_COUNT`
+
+**Default:** `0`
+
+---
+
+#### Password expiry days
+
+Days until password expires (0=never)
+
+**Environment Variable:** `PASSWORD_EXPIRY_DAYS`
+
+**Default:** `0`
+
+---
+
+#### Password expiry warning period
+
+Days before expiry to show warning
+
+**Environment Variable:** `PASSWORD_EXPIRY_WARNING_DAYS`
+
+**Default:** `7`
+
+---
+
+
+## Account Lifecycle 🔧
+
+Account expiration and automated management (Optional)
+
+> **Note:** This is an optional feature. Set `LIFECYCLE_ENABLED=TRUE` to enable.
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable account lifecycle management<br><small>Automatic account expiration and cleanup</small> | ✅ boolean | `FALSE` | `LIFECYCLE_ENABLED` | Enable account lifecycle management |
+| Enable account expiration<br><small>Automatically disable accounts after expiry date</small> | ✅ boolean | `FALSE` | `ACCOUNT_EXPIRY_ENABLED` | Enable account expiration |
+| Account inactivity threshold<br><small>Days of inactivity before account is disabled</small> | integer | 📝 `90` | `ACCOUNT_INACTIVE_DAYS` | Account inactivity threshold |
+| Account expiry warning period<br><small>Days before expiry to send warning email</small> | integer | 📝 `14` | `ACCOUNT_EXPIRY_WARNING_DAYS` | Account expiry warning period |
+| Enable automatic account cleanup<br><small>Automatically delete expired accounts (use with caution)</small> | ✅ boolean | `FALSE` | `ACCOUNT_CLEANUP_ENABLED` | Enable automatic account cleanup |
+
+### Details
+
+#### Enable account lifecycle management
+
+Automatic account expiration and cleanup
+
+**Environment Variable:** `LIFECYCLE_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Enable account expiration
+
+Automatically disable accounts after expiry date
+
+**Environment Variable:** `ACCOUNT_EXPIRY_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Account inactivity threshold
+
+Days of inactivity before account is disabled
+
+**Environment Variable:** `ACCOUNT_INACTIVE_DAYS`
+
+**Default:** `90`
+
+---
+
+#### Account expiry warning period
+
+Days before expiry to send warning email
+
+**Environment Variable:** `ACCOUNT_EXPIRY_WARNING_DAYS`
+
+**Default:** `14`
+
+---
+
+#### Enable automatic account cleanup
+
+Automatically delete expired accounts (use with caution)
+
+**Environment Variable:** `ACCOUNT_CLEANUP_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+
+## Advanced Group Management 🔧
+
+Enhanced group management features (Optional)
+
+> **Note:** This is an optional feature. Set `GROUP_BULK_OPERATIONS_ENABLED=TRUE` to enable.
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable bulk group operations<br><small>Add/remove multiple users to groups at once</small> | ✅ boolean | `FALSE` | `GROUP_BULK_OPERATIONS_ENABLED` | Enable bulk group operations |
+| Enable group templates<br><small>Create groups from predefined templates</small> | ✅ boolean | `FALSE` | `GROUP_TEMPLATES_ENABLED` | Enable group templates |
+| Enable nested groups<br><small>Groups can contain other groups (requires RFC2307bis)</small> | ✅ boolean | `FALSE` | `GROUP_NESTING_ENABLED` | Enable nested groups |
+
+### Details
+
+#### Enable bulk group operations
+
+Add/remove multiple users to groups at once
+
+**Environment Variable:** `GROUP_BULK_OPERATIONS_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Enable group templates
+
+Create groups from predefined templates
+
+**Environment Variable:** `GROUP_TEMPLATES_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+#### Enable nested groups
+
+Groups can contain other groups (requires RFC2307bis)
+
+**Environment Variable:** `GROUP_NESTING_ENABLED`
+
+**Default:** `FALSE`
+
+---
+
+
+## Debug & Logging
+
+Debug modes and verbose logging
+
+| Configuration | Type | Default | Environment Variable | Description |
+|--------------|------|---------|---------------------|-------------|
+| Enable LDAP debug logging<br><small>WARNING: May expose sensitive information</small> | ✅ boolean | `FALSE` | `LDAP_DEBUG` | Enable LDAP debug logging |
+| Verbose LDAP connection logs<br><small>Log all LDAP connection details</small> | ✅ boolean | `FALSE` | `LDAP_VERBOSE_CONNECTION_LOGS` | Verbose LDAP connection logs |
+| Enable session debug logging<br><small>Log session management details</small> | ✅ boolean | `FALSE` | `SESSION_DEBUG` | Enable session debug logging |
+| SMTP debug level<br><small>0=off, 1=client, 2=client+server, 3=verbose, 4=very verbose</small> | integer | 📝 `0` | `SMTP_LOG_LEVEL` | SMTP debug level |
+
+### Details
+
+#### Enable LDAP debug logging
+
+WARNING: May expose sensitive information
+
+**Environment Variable:** `LDAP_DEBUG`
+
+**Default:** `FALSE`
+
+---
+
+#### Verbose LDAP connection logs
+
+Log all LDAP connection details
+
+**Environment Variable:** `LDAP_VERBOSE_CONNECTION_LOGS`
+
+**Default:** `FALSE`
+
+---
+
+#### Enable session debug logging
+
+Log session management details
+
+**Environment Variable:** `SESSION_DEBUG`
+
+**Default:** `FALSE`
+
+---
+
+#### SMTP debug level
+
+0=off, 1=client, 2=client+server, 3=verbose, 4=very verbose
+
+**Environment Variable:** `SMTP_LOG_LEVEL`
+
+**Default:** `0`
+
+---
+
+
+## Environment Variable Summary
+
+For a complete list of environment variables and their current values, log in as an administrator and navigate to **System Config** in the main menu.
+
+## Configuration Best Practices
+
+### Security
+
+1. **Never commit sensitive values** to version control (e.g., `LDAP_ADMIN_BIND_PWD`, `SMTP_PASSWORD`)
+2. **Use strong passwords** for admin bind DN and SMTP authentication
+3. **Enable TLS/SSL** for LDAP and SMTP connections in production
+4. **Restrict editable attributes** carefully to prevent privilege escalation
+5. **Review the attribute blacklist** - these attributes should never be user-editable
+
+### Performance
+
+1. **Minimize debug logging** in production (disable `LDAP_DEBUG`, `SESSION_DEBUG`, `SMTP_LOG_LEVEL`)
+2. **Use connection pooling** for LDAP when available
+3. **Set appropriate session timeouts** based on your security requirements
+
+### Maintenance
+
+1. **Document custom configurations** - note why you changed from defaults
+2. **Test configuration changes** in a development environment first
+3. **Review the System Config page** regularly to identify drift from defaults
+4. **Keep environment variables** in a secure configuration management system
+
+## Adding New Configuration Options
+
+To add new configuration options:
+
+1. Open `www/includes/config_registry.inc.php`
+2. Add your configuration to the appropriate category in `$CONFIG_REGISTRY`
+3. Include all metadata: description, help, type, default, mandatory, env_var, variable
+4. The System Config page and this documentation will auto-update
+
+Example:
+
+```php
+'MY_NEW_CONFIG' => array(
+  'category' => 'interface',
+  'description' => 'My new configuration option',
+  'help' => 'Detailed explanation of what this does and how to use it',
+  'type' => 'string',
+  'default' => 'default_value',
+  'mandatory' => false,
+  'env_var' => 'MY_NEW_CONFIG',
+  'variable' => '$MY_NEW_CONFIG',
+  'display_code' => false
+),
 ```
 
-**Any environment variable can use the `_FILE` suffix** to read from a file instead of being set directly.
+## Getting Help
+
+- Check the [System Config page](#) to see current values and defaults
+- Review [GitHub Issues](https://github.com/wheelybird/ldap-user-manager/issues) for common questions
+- Consult LDAP server documentation for LDAP-specific settings
+
+---
+
+*This documentation was automatically generated from the configuration registry.*
+*Last updated: 2025-11-10 11:20:37 UTC*

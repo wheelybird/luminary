@@ -13,12 +13,10 @@
 $includes_path = __DIR__ . '/../www/includes';
 set_include_path(".:{$includes_path}");
 
-// Load configuration registry directly (standalone mode)
-// We only need the registry data structures, not the full config environment
 include_once "{$includes_path}/config_registry.inc.php";
 
 // Output file
-$output_file = __DIR__ . '/configuration.md';
+$output_file = __DIR__ . '/../docs/configuration.md';
 
 echo "Generating configuration documentation...\n";
 

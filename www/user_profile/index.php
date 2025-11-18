@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
 
 set_page_access("user");
 
@@ -282,6 +283,174 @@ if (isset($user[0]['cn'][0])) {
 
     </div>
   </div>
+
+  <?php
+  // Display password information if password policy is enabled
+  if ($PASSWORD_POLICY_ENABLED && $PPOLICY_ENABLED && $PASSWORD_EXPIRY_DAYS > 0) {
+    include_once "password_policy_functions.inc.php";
+
+    // Get password information
+    $user_search_pwd = ldap_search($ldap_connection, $LDAP['user_dn'],
+      "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+      array('dn'));
+
+    if ($user_search_pwd) {
+      $user_pwd = ldap_get_entries($ldap_connection, $user_search_pwd);
+      if ($user_pwd['count'] > 0) {
+        $user_dn_pwd = $user_pwd[0]['dn'];
+        $password_changed_time = password_policy_get_changed_time($ldap_connection, $user_dn_pwd);
+
+        if ($password_changed_time) {
+          // Calculate password age and expiry
+          $timestamp = strtotime($password_changed_time);
+          $password_changed_formatted = date('F j, Y \a\t g:i A', $timestamp);
+          $age_seconds = time() - $timestamp;
+          $password_age_days = floor($age_seconds / 86400);
+          $password_expires_in_days = $PASSWORD_EXPIRY_DAYS - $password_age_days;
+          $expiry_date = date('F j, Y', $timestamp + ($PASSWORD_EXPIRY_DAYS * 86400));
+
+          // Determine status
+          $status_class = 'success';
+          $status_text = 'OK';
+          if ($password_expires_in_days <= 0) {
+            $status_class = 'danger';
+            $status_text = 'Expired';
+          } elseif ($password_expires_in_days <= $PASSWORD_EXPIRY_WARNING_DAYS) {
+            $status_class = 'warning';
+            $status_text = 'Expiring Soon';
+          }
+  ?>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h4 class="card-title">
+        Password Information
+        <span class="badge bg-<?php echo $status_class; ?> float-end"><?php echo $status_text; ?></span>
+      </h4>
+    </div>
+    <div class="card-body">
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Last Changed:</strong></div>
+        <div class="col-sm-8"><?php echo $password_changed_formatted; ?></div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Password Age:</strong></div>
+        <div class="col-sm-8"><?php echo $password_age_days; ?> day<?php echo $password_age_days != 1 ? 's' : ''; ?></div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Expiry Date:</strong></div>
+        <div class="col-sm-8"><?php echo $expiry_date; ?></div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Days Until Expiry:</strong></div>
+        <div class="col-sm-8">
+          <?php if ($password_expires_in_days > 0): ?>
+            <span class="text-<?php echo $status_class; ?>"><?php echo $password_expires_in_days; ?> day<?php echo $password_expires_in_days != 1 ? 's' : ''; ?></span>
+          <?php else: ?>
+            <span class="text-danger">Password has expired</span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-sm-12">
+          <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">
+            <i class="bi bi-key"></i> Change Password
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?php
+        }
+      }
+    }
+  }
+  ?>
+
+  <?php
+  // Display account lifecycle information if enabled
+  if ($LIFECYCLE_ENABLED == TRUE && $ACCOUNT_EXPIRY_ENABLED == TRUE) {
+    include_once "account_lifecycle_functions.inc.php";
+
+    // Get account expiration information
+    $account_days_remaining = null;
+    $account_is_expired = account_lifecycle_is_expired($ldap_connection, $user_dn_profile, $account_days_remaining);
+    $account_should_warn = account_lifecycle_should_warn($ldap_connection, $user_dn_profile, $account_days_remaining);
+    $account_expiry_date_formatted = account_lifecycle_get_expiry_date_formatted($ldap_connection, $user_dn_profile, 'F j, Y');
+    $account_expiry_timestamp = account_lifecycle_get_expiry_timestamp($ldap_connection, $user_dn_profile);
+    $account_create_time = account_lifecycle_get_create_time($ldap_connection, $user_dn_profile);
+
+    // Convert LDAP timestamps to formatted strings
+    $account_created_formatted = null;
+    if ($account_create_time) {
+      $create_timestamp = account_lifecycle_ldap_to_timestamp($account_create_time);
+      if ($create_timestamp) {
+        $account_created_formatted = date('F j, Y', $create_timestamp);
+      }
+    }
+
+    // Only display if account has an expiration date or is approaching expiry
+    if ($account_expiry_date_formatted !== null || $account_is_expired || $account_should_warn) {
+
+      // Determine account status
+      $account_status_class = 'success';
+      $account_status_text = 'OK';
+      if ($account_is_expired) {
+        $account_status_class = 'danger';
+        $account_status_text = 'Expired';
+      } elseif ($account_should_warn) {
+        $account_status_class = 'warning';
+        $account_status_text = 'Expiring Soon';
+      }
+  ?>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h4 class="card-title">
+        Account Information
+        <span class="badge bg-<?php echo $account_status_class; ?> float-end"><?php echo $account_status_text; ?></span>
+      </h4>
+    </div>
+    <div class="card-body">
+      <?php if ($account_created_formatted): ?>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Account Created:</strong></div>
+        <div class="col-sm-8"><?php echo $account_created_formatted; ?></div>
+      </div>
+      <?php endif; ?>
+      <?php if ($account_expiry_date_formatted !== null): ?>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Expiration Date:</strong></div>
+        <div class="col-sm-8"><?php echo $account_expiry_date_formatted; ?></div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-sm-4"><strong>Days Until Expiry:</strong></div>
+        <div class="col-sm-8">
+          <?php if ($account_is_expired): ?>
+            <span class="text-danger">Account expired <?php echo abs($account_days_remaining); ?> day<?php echo abs($account_days_remaining) != 1 ? 's' : ''; ?> ago</span>
+          <?php elseif ($account_days_remaining !== null && $account_days_remaining > 0): ?>
+            <span class="text-<?php echo $account_status_class; ?>"><?php echo $account_days_remaining; ?> day<?php echo $account_days_remaining != 1 ? 's' : ''; ?></span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endif; ?>
+      <?php if ($account_should_warn || $account_is_expired): ?>
+      <div class="alert alert-<?php echo $account_status_class; ?>">
+        <?php if ($account_is_expired): ?>
+          <strong>Your account has expired.</strong> Please contact your administrator for assistance.
+        <?php else: ?>
+          <strong>Your account will expire soon.</strong> Please contact your administrator if you need an extension.
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <?php
+    }
+  }
+  ?>
 
 </div>
 

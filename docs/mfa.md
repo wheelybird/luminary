@@ -13,6 +13,37 @@ The MFA system provides:
 - **Admin Management**: Admins can view MFA status and regenerate backup codes
 - **Integration**: Works seamlessly with [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp)
 
+## Scope: Luminary Login Enforcement
+
+**Important:** The group-based MFA enforcement described in this document applies to **Luminary login only**. When a user logs into the Luminary web interface, their group membership is checked to determine if MFA is required.
+
+Other services that use TOTP from LDAP (such as VPN via [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp), SSH, sudo, etc.) use **service-specific configuration** to determine MFA requirements. They do NOT check the `mfaRequired` attribute on LDAP groups.
+
+**Why this separation?**
+
+Different services have different security needs:
+- **VPN** needs MFA (external access point)
+- **SSH** might not need MFA (users are already on the VPN)
+- **sudo** should not require MFA (too frequent, would be disruptive)
+
+Rather than enforcing MFA globally via LDAP group membership, each service decides its own MFA policy through configuration (e.g., environment variables, PAM configuration).
+
+**Typical setup:**
+```bash
+# Luminary - checks LDAP group mfaRequired attribute
+docker run -e MFA_FEATURE_ENABLED=TRUE luminary
+# Group "admins" has mfaRequired=TRUE in LDAP → requires TOTP to log into Luminary
+
+# VPN - uses service configuration
+docker run -e MFA_REQUIRED_GROUPS=vpn-users openvpn-server-ldap-otp
+# Only users in "vpn-users" need MFA for VPN access
+
+# SSH - configured separately (maybe no MFA required)
+# PAM stack without TOTP module → password-only authentication
+```
+
+This gives you fine-grained control: users in the "admins" group need MFA to log into Luminary, users in "vpn-users" need MFA for VPN, but SSH access can remain password-only.
+
 ## Requirements
 
 ### 1. TOTP LDAP Schema
@@ -22,11 +53,18 @@ The MFA features require a custom LDAP schema to store TOTP configuration. Insta
 **https://github.com/wheelybird/ldap-totp-schema**
 
 This adds the following to your LDAP directory:
+
+**User Attributes:**
 - `totpUser` objectClass for users with MFA
 - `totpSecret` attribute for the TOTP shared secret
 - `totpStatus` attribute for enrolment status
 - `totpEnrolledDate` attribute for tracking grace periods
 - `totpScratchCode` attribute for backup codes
+
+**Group Attributes (Optional):**
+- `mfaGroup` objectClass for groups with MFA requirements
+- `mfaRequired` attribute to mark a group as requiring MFA
+- `mfaGracePeriodDays` attribute for per-group grace periods
 
 ### 2. Authenticator App
 
@@ -42,11 +80,11 @@ Users need a TOTP authenticator app on their mobile device:
 
 ### Basic Setup
 
-Enable MFA and configure enforcement:
+Enable MFA features and configure enforcement:
 
 ```bash
 docker run \
-  -e MFA_ENABLED=TRUE \
+  -e MFA_FEATURE_ENABLED=TRUE \
   -e MFA_REQUIRED_GROUPS=admins,developers \
   -e MFA_GRACE_PERIOD_DAYS=7 \
   -e MFA_TOTP_ISSUER="Example Ltd" \
@@ -55,17 +93,22 @@ docker run \
 
 ### Configuration Variables
 
+#### Core MFA Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MFA_ENABLED` | `FALSE` | Enable MFA features |
-| `MFA_REQUIRED_GROUPS` | None | Comma-separated list of groups requiring MFA |
-| `MFA_GRACE_PERIOD_DAYS` | `7` | Days allowed for MFA setup |
+| `MFA_FEATURE_ENABLED` | `FALSE` | Enable MFA management features in Luminary |
+| `MFA_REQUIRED_GROUPS` | None | Comma-separated list of groups requiring MFA for Luminary login (config-based fallback) |
+| `MFA_GRACE_PERIOD_DAYS` | `7` | Default days allowed for MFA setup (config-based fallback) |
 | `MFA_TOTP_ISSUER` | `$ORGANISATION_NAME` | Name shown in authenticator apps |
 
-### Custom Schema Attributes
+**Note:** `MFA_REQUIRED_GROUPS` is used when groups don't have MFA settings stored in LDAP. This only affects **Luminary login**. See "MFA Enforcement Methods for Luminary" below for details.
+
+#### Custom Schema Attributes
 
 If you're using a custom TOTP schema with different attribute names:
 
+**User TOTP Attributes:**
 ```bash
 -e TOTP_SECRET_ATTRIBUTE=myTotpSecret \
 -e TOTP_STATUS_ATTRIBUTE=myTotpStatus \
@@ -73,6 +116,72 @@ If you're using a custom TOTP schema with different attribute names:
 -e TOTP_SCRATCH_CODES_ATTRIBUTE=myBackupCodes \
 -e TOTP_OBJECTCLASS=myTotpUser
 ```
+
+**Group MFA Attributes (for LDAP-based enforcement):**
+```bash
+-e GROUP_MFA_OBJECTCLASS=myMfaGroup \
+-e GROUP_MFA_REQUIRED_ATTRIBUTE=myMfaRequired \
+-e GROUP_MFA_GRACE_PERIOD_ATTRIBUTE=myMfaGracePeriod
+```
+
+## MFA Enforcement Methods for Luminary Login
+
+Luminary supports two methods for determining which users require MFA to log into the web interface:
+
+### 1. LDAP-Based (Recommended)
+
+Store MFA requirements directly in LDAP group objects. This provides:
+- **Per-group grace periods**: Each group can have its own grace period
+- **Centralized management**: MFA policies stored alongside group data
+- **UI management**: Admins can configure via the Luminary web interface
+- **Better auditing**: Changes tracked in LDAP modify logs
+
+**Setup:**
+1. Ensure the `mfaGroup` objectClass and attributes are in your LDAP schema
+2. In Luminary, navigate to a group's details page
+3. Enable "Members must enroll in MFA" and set the grace period
+4. The group object is automatically updated with `mfaRequired=TRUE` and `mfaGracePeriodDays`
+
+**Example LDIF:**
+```ldif
+dn: cn=admins,ou=groups,dc=example,dc=com
+objectClass: groupOfUniqueNames
+objectClass: mfaGroup
+cn: admins
+mfaRequired: TRUE
+mfaGracePeriodDays: 7
+uniqueMember: uid=alice,ou=people,dc=example,dc=com
+```
+
+### 2. Config-Based (Fallback)
+
+Specify groups via environment variables. This is simpler but less flexible:
+
+```bash
+-e MFA_REQUIRED_GROUPS=admins,developers,security \
+-e MFA_GRACE_PERIOD_DAYS=7
+```
+
+**Limitations:**
+- All groups share the same grace period
+- Changes require container restart
+- No per-group customization
+
+### Which Method to Use?
+
+**Use LDAP-based when:**
+- You control the LDAP schema and can install extensions
+- You want per-group grace periods
+- You want to manage MFA settings via the web UI
+- You need detailed audit trails
+
+**Use Config-based when:**
+- You cannot modify the LDAP schema (e.g., Active Directory, hosted LDAP)
+- You're using alternative TOTP schemas (e.g., Google's schema)
+- You have simple requirements (same grace period for all groups)
+- You prefer environment variable configuration
+
+**Both methods work together:** Luminary checks LDAP first, then falls back to `MFA_REQUIRED_GROUPS` if no LDAP-based requirement is found. This allows you to use LDAP-based for some groups and config-based for others.
 
 ## User Enrolment Process
 
@@ -132,13 +241,26 @@ When a user is added to an MFA-required group:
 
 ### Configuring Grace Periods
 
+**Global Setting (Config-Based):**
 ```bash
-# 14-day grace period
+# 14-day grace period for all groups
 -e MFA_GRACE_PERIOD_DAYS=14
 
 # No grace period (immediate enforcement)
 -e MFA_GRACE_PERIOD_DAYS=0
 ```
+
+**Per-Group Setting (LDAP-Based):**
+
+When using LDAP-based MFA enforcement, each group can have its own grace period:
+
+1. Navigate to the group's details page in Luminary
+2. Set the "Grace Period (Days)" field to the desired value
+3. The `mfaGracePeriodDays` attribute is updated in LDAP
+
+**Example:** The "admins" group could have a 3-day grace period while "developers" have 14 days.
+
+**Priority:** If a user is in multiple MFA-required groups with different grace periods, the **longest** grace period applies.
 
 ## Admin Management
 
@@ -163,14 +285,34 @@ If a user has lost their backup codes or used most of them:
 
 **Note:** Only administrators can regenerate backup codes. Users cannot regenerate their own codes to prevent circumventing MFA requirements.
 
+### Managing Group MFA Settings
+
+Administrators can configure MFA requirements for groups via the Luminary UI (when using LDAP-based enforcement):
+
+1. Navigate to **Account Manager** → **Groups**
+2. Click on a group name to view details
+3. Scroll to the **Multi-Factor Authentication Settings** section
+4. Toggle **"Members must enroll in MFA"**
+5. Set the **Grace Period (Days)** for the group
+6. Click **Save MFA Settings**
+
+The group object is automatically updated with:
+- `mfaGroup` objectClass (if not already present)
+- `mfaRequired` attribute set to `TRUE` or `FALSE`
+- `mfaGracePeriodDays` attribute with the specified value
+
+**Requirements:**
+- `MFA_FEATURE_ENABLED=TRUE`
+- LDAP schema with `mfaGroup` objectClass (or custom configured attributes)
+
 ### System Status Panel
 
 Administrators see an MFA status panel on the home page showing:
 
 - MFA enabled/disabled status
 - TOTP schema installation status
-- List of MFA-required groups
-- Grace period setting
+- List of MFA-required groups (config-based)
+- Default grace period setting
 
 ## Integration with OpenVPN
 
@@ -301,7 +443,7 @@ ldapsearch -x -H ldap://localhost -D "cn=admin,dc=example,dc=com" -w password \
 When enabling MFA on an established LDAP directory:
 
 1. **Install Schema**: Add the TOTP schema to LDAP
-2. **Enable MFA**: Set `MFA_ENABLED=TRUE`
+2. **Enable MFA**: Set `MFA_FEATURE_ENABLED=TRUE`
 3. **Test First**: Start with a test group, not production admins
 4. **Configure Groups**: Set `MFA_REQUIRED_GROUPS` for test group
 5. **User Communication**: Notify users before enforcement
@@ -311,15 +453,91 @@ When enabling MFA on an established LDAP directory:
 
 ### Disabling MFA
 
-To temporarily disable MFA:
+To temporarily disable MFA features:
 
 ```bash
--e MFA_ENABLED=FALSE
+-e MFA_FEATURE_ENABLED=FALSE
 ```
 
-This disables MFA enforcement but preserves existing enrolments. Users who have already enrolled will keep their TOTP configuration in LDAP.
+This disables MFA management and enforcement but preserves existing enrolments. Users who have already enrolled will keep their TOTP configuration in LDAP.
 
-To re-enable, set `MFA_ENABLED=TRUE` and existing enrolments will work immediately.
+To re-enable, set `MFA_FEATURE_ENABLED=TRUE` and existing enrolments will work immediately.
+
+### Group-Based MFA Enforcement for Luminary Login
+
+Luminary enforces MFA at login based on group membership. Users in MFA-required groups must enter their TOTP code after password validation.
+
+**Behavior:**
+
+- **Users in MFA-required groups with active MFA:**
+  - Enter password → Enter TOTP code → Access granted
+
+- **Users in MFA-required groups without MFA (within grace period):**
+  - Enter password → Redirected to MFA setup page
+  - Can only access MFA enrollment until setup is complete
+
+- **Users in MFA-required groups with expired grace period:**
+  - Cannot log in until MFA is configured
+
+- **Users NOT in MFA-required groups:**
+  - Enter password → Access granted (no TOTP required)
+
+**Example Configuration:**
+
+```bash
+# Enable MFA features
+-e MFA_FEATURE_ENABLED=TRUE
+
+# Option 1: LDAP-based (recommended)
+# Set mfaRequired=TRUE on the admins group in LDAP via Luminary UI
+# Admins will require TOTP at login, other users won't
+
+# Option 2: Config-based (fallback)
+-e MFA_REQUIRED_GROUPS=admins,security
+# Users in these groups require TOTP at login
+```
+
+**Use Cases:**
+
+- **Admin-only MFA:** Set `mfaRequired=TRUE` on the admins group - Only administrators enter TOTP codes at login, regular users just need passwords
+- **Phased rollout:** Enable MFA for IT team first, then expand to other groups progressively
+- **Risk-based access:** Require MFA for high-privilege groups (admins, finance) but not read-only users
+
+**Important Notes:**
+
+- MFA enforcement for Luminary login depends on group membership (whether LDAP-based or config-based)
+- After password validation, the login flow checks if the user is in an MFA-required group
+- If multiple groups have different grace periods, the **shortest** grace period applies
+- This group-based enforcement is specific to Luminary - see below for other services
+
+### MFA Enforcement Across Different Services
+
+**Important:** MFA enforcement by group membership depends on whether the service supports it. Not all services check group membership when enforcing MFA.
+
+**Services That Support Group-Based Enforcement:**
+
+- **Luminary** (this web UI): ✅ Checks group membership at login
+  - Users in MFA-required groups must enter TOTP
+  - Users not in such groups can log in with password only
+
+**Services With Configurable Enforcement:**
+
+- **pam-ldap-totp-auth** (PAM module for SSH, VPN, etc.): Planned feature
+  - Current behavior: All-or-nothing (if PAM module is configured, ALL users need MFA)
+  - **Planned**: New `group_based_enforcement` option to check LDAP group membership
+  - See PAM module documentation for updates
+
+**Service-Level vs. Group-Level:**
+
+The group MFA settings in LDAP (`mfaRequired`, `mfaGracePeriodDays`) serve two purposes:
+
+1. **Enrollment Tracking** (all services): Determines who should set up MFA and manages grace periods
+2. **Access Control** (service-dependent): Some services check group membership before requiring TOTP validation
+
+When deploying MFA:
+- Group settings control enrollment requirements (universal)
+- Each service decides whether to check group membership or enforce for all users
+- Check service-specific documentation for MFA enforcement behavior
 
 ## Advanced Topics
 

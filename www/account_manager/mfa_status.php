@@ -96,12 +96,15 @@ foreach ($people as $username => $attribs) {
       $people[$username]['mfa_enrolled_date'] = $enrolled_date;
 
       // Check if user requires MFA
-      $requires_mfa = totp_user_requires_mfa($ldap_connection, $username, $MFA_REQUIRED_GROUPS);
+      $mfa_result = totp_user_requires_mfa($ldap_connection, $username, $MFA_REQUIRED_GROUPS);
+      $requires_mfa = $mfa_result['required'];
       $people[$username]['mfa_required'] = $requires_mfa;
 
       // Calculate grace period
       if ($status == 'pending' && $enrolled_date && $requires_mfa) {
-        $days_remaining = totp_grace_period_remaining($enrolled_date, $MFA_GRACE_PERIOD_DAYS);
+        // Use group-specific grace period if available, otherwise use global setting
+        $grace_period = $mfa_result['grace_period'] !== null ? $mfa_result['grace_period'] : $MFA_GRACE_PERIOD_DAYS;
+        $days_remaining = totp_grace_period_remaining($enrolled_date, $grace_period);
         $people[$username]['grace_days_remaining'] = $days_remaining;
 
         if ($days_remaining <= 0) {
@@ -198,9 +201,9 @@ foreach ($people as $username => $attribs) {
       <table class="table table-condensed">
         <tr>
           <th>MFA Enabled:</th>
-          <td><?php echo $MFA_ENABLED ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; ?></td>
+          <td><?php echo $MFA_FEATURE_ENABLED ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; ?></td>
         </tr>
-        <?php if ($MFA_ENABLED && !empty($MFA_REQUIRED_GROUPS)) { ?>
+        <?php if ($MFA_FEATURE_ENABLED && !empty($MFA_REQUIRED_GROUPS)) { ?>
           <tr>
             <th>Required Groups:</th>
             <td><?php echo implode(', ', $MFA_REQUIRED_GROUPS); ?></td>

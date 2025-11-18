@@ -102,7 +102,7 @@ else {
 <?php
 
 // Check MFA configuration and schema availability
-if ($MFA_ENABLED == TRUE) {
+if ($MFA_FEATURE_ENABLED == TRUE) {
 
  $totp_objectclass = $TOTP_ATTRS['objectclass'];
  $totp_secret_attr = $TOTP_ATTRS['secret'];
@@ -170,7 +170,7 @@ if ($MFA_ENABLED == TRUE) {
 
 }
 else {
- print "$li_good MFA is not enabled (MFA_ENABLED is not set to TRUE).</li>\n";
+ print "$li_good MFA features are not enabled (MFA_FEATURE_ENABLED is not set to TRUE).</li>\n";
 }
 
 ?>

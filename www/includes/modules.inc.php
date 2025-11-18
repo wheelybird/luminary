@@ -29,7 +29,7 @@
                     'manage_mfa'      => 'Manage MFA',
                   );
 
-if ($MFA_ENABLED == TRUE) {
+if ($MFA_FEATURE_ENABLED == TRUE) {
   $MODULES['manage_mfa'] = 'auth';
 }
 

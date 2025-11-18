@@ -5,6 +5,8 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
 include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
+include_once "password_policy_functions.inc.php";
 include_once "module_functions.inc.php";
 
 $attribute_map = $LDAP['default_attribute_map'];
@@ -49,6 +51,8 @@ $invalid_givenname = FALSE;
 $invalid_sn = FALSE;
 $invalid_account_identifier = FALSE;
 $account_attribute = $LDAP['account_attribute'];
+$password_fails_policy = FALSE;
+$password_policy_errors = array();
 
 $new_account_r = array();
 
@@ -170,12 +174,27 @@ if (isset($_POST['create_account'])) {
  if ((!isset($account_identifier) or $account_identifier == "") and $invalid_cn != TRUE) { $invalid_account_identifier = TRUE; }
  if (!isset($this_givenname) or $this_givenname == "") { $invalid_givenname = TRUE; }
  if (!isset($this_sn) or $this_sn == "") { $invalid_sn = TRUE; }
- if ((!is_numeric($_POST['pass_score']) or $_POST['pass_score'] < 3) and $ACCEPT_WEAK_PASSWORDS != TRUE) { $weak_password = TRUE; }
+ // Use password policy strength check if enabled, otherwise fall back to client-side score
+ if (!$PASSWORD_POLICY_ENABLED && (!is_numeric($_POST['pass_score']) or $_POST['pass_score'] < 3) and $ACCEPT_WEAK_PASSWORDS != TRUE) { $weak_password = TRUE; }
  if (isset($this_mail) and !is_valid_email($this_mail)) { $invalid_email = TRUE; }
  if (preg_match("/\"|'/",$password)) { $invalid_password = TRUE; }
  if ($password != $_POST['password_match']) { $mismatched_passwords = TRUE; }
  if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$account_identifier)) { $invalid_account_identifier = TRUE; }
  if (isset($_POST['send_email']) and isset($mail) and $EMAIL_SENDING_ENABLED == TRUE) { $send_user_email = TRUE; }
+
+ // Password policy validation
+ $password_policy_errors = array();
+ $password_fails_policy = false;
+ if (!password_policy_validate($password, $password_policy_errors)) {
+   $password_fails_policy = true;
+ }
+ $password_strength_score = 0;
+ if (!password_policy_check_strength($password, $password_strength_score)) {
+   $password_fails_policy = true;
+   if (empty($password_policy_errors)) {
+     $password_policy_errors[] = "Password strength is too weak";
+   }
+ }
 
  if (     isset($this_givenname)
       and isset($this_sn)
@@ -185,15 +204,30 @@ if (isset($_POST['create_account'])) {
       and !$invalid_password
       and !$invalid_account_identifier
       and !$invalid_cn
-      and !$invalid_email) {
+      and !$invalid_email
+      and !$password_fails_policy) {
 
   $ldap_connection = open_ldap_connection();
   $new_account = ldap_new_account($ldap_connection, $new_account_r);
 
   if ($new_account) {
+    // Set password changed timestamp for password policy
+    $user_dn = "{$LDAP['account_attribute']}={$account_identifier},{$LDAP['user_dn']}";
+    password_policy_set_changed_time($ldap_connection, $user_dn);
+
+    // Add password to history
+    $password_hash = ldap_hashed_password($password);
+    password_policy_add_to_history($ldap_connection, $user_dn, $password_hash);
+
+    // Audit log user creation
+    $user_details = "givenName: {$this_givenname}, surname: {$this_sn}";
+    if (isset($this_mail)) {
+      $user_details .= ", email: {$this_mail}";
+    }
+    audit_log('user_created', $account_identifier, $user_details, 'success', $USER_ID);
 
     // Check if MFA is enabled and if user will be in an MFA-required group
-    if ($MFA_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
+    if ($MFA_FEATURE_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
       // Get the groups this user will be added to
       $user_groups = array();
       if (isset($DEFAULT_USER_GROUP)) {
@@ -279,12 +313,15 @@ if (isset($_POST['create_account'])) {
    exit(0);
   }
   else {
+    // Audit log failed user creation
+    $error_msg = ldap_error($ldap_connection);
+    audit_log('user_create_failure', $account_identifier, "Failed to create user: {$error_msg}", 'failure', $USER_ID);
   ?>
     <div class="alert alert-warning">
      <p class="text-center">Failed to create the account:</p>
      <pre>
      <?php
-       print ldap_error($ldap_connection) . "\n";
+       print $error_msg . "\n";
        ldap_get_option($ldap_connection, LDAP_OPT_DIAGNOSTIC_MESSAGE, $detailed_err);
        print $detailed_err;
      ?>
@@ -311,6 +348,11 @@ if ($invalid_password) { $errors.="<li>The password contained invalid characters
 if ($invalid_email) { $errors.="<li>The email address is invalid</li>\n"; }
 if ($mismatched_passwords) { $errors.="<li>The passwords are mismatched</li>\n"; }
 if ($invalid_username) { $errors.="<li>The username is invalid</li>\n"; }
+if ($password_fails_policy && !empty($password_policy_errors)) {
+  foreach ($password_policy_errors as $policy_error) {
+    $errors.="<li>" . htmlspecialchars($policy_error) . "</li>\n";
+  }
+}
 
 if ($errors != "") { ?>
 <div class="alert alert-warning">

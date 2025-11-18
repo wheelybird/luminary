@@ -4,8 +4,53 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
+include_once "password_policy_functions.inc.php";
 
 set_page_access("user");
+
+// Check if this is a forced password change due to expiry
+$password_expired_forced = isset($_GET['password_expired']);
+
+// Get password expiry information if password policy is enabled
+$password_age_days = null;
+$password_expires_in_days = null;
+$password_changed_time = null;
+$password_changed_formatted = null;
+
+if ($PASSWORD_POLICY_ENABLED && $PPOLICY_ENABLED && $PASSWORD_EXPIRY_DAYS > 0) {
+  $ldap_connection = open_ldap_connection();
+
+  // Get user DN
+  $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+    "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+    array('dn'));
+
+  if ($user_search) {
+    $user_entry = ldap_get_entries($ldap_connection, $user_search);
+    if ($user_entry['count'] > 0) {
+      $user_dn = $user_entry[0]['dn'];
+
+      // Get password changed time
+      $password_changed_time = password_policy_get_changed_time($ldap_connection, $user_dn);
+
+      if ($password_changed_time) {
+        // Parse LDAP timestamp (format: YYYYMMDDHHMMSSZ)
+        $timestamp = strtotime($password_changed_time);
+        $password_changed_formatted = date('F j, Y', $timestamp);
+
+        // Calculate age
+        $age_seconds = time() - $timestamp;
+        $password_age_days = floor($age_seconds / 86400);
+
+        // Calculate days until expiry
+        $password_expires_in_days = $PASSWORD_EXPIRY_DAYS - $password_age_days;
+      }
+    }
+  }
+
+  ldap_close($ldap_connection);
+}
 
 if (isset($_POST['change_password'])) {
 
@@ -14,12 +59,42 @@ if (isset($_POST['change_password'])) {
  if (preg_match("/\"|'/",$_POST['password'])) { $invalid_chars = 1; }
  if ($_POST['password'] != $_POST['password_match']) { $mismatched = 1; }
 
- if (!isset($mismatched) and !isset($not_strong_enough) and !isset($invalid_chars) ) {
+ // ppolicy requires current password
+ if ($PPOLICY_ENABLED && !isset($_POST['current_password'])) {
+   $missing_current_password = 1;
+ }
 
-  $ldap_connection = open_ldap_connection();
-  ldap_change_password($ldap_connection,$USER_ID,$_POST['password']) or die("change_ldap_password() failed.");
+ if (!isset($mismatched) and !isset($not_strong_enough) and !isset($invalid_chars) and !isset($missing_current_password)) {
 
-  render_header("$ORGANISATION_NAME account manager - password changed");
+  $password_changed = false;
+  $change_error = null;
+
+  // Try ppolicy-aware password change if enabled
+  if ($PPOLICY_ENABLED) {
+    $password_changed = password_policy_self_service_change($USER_ID, $_POST['current_password'], $_POST['password'], $change_error);
+    if (!$password_changed && $change_error) {
+      // Check for ppolicy-specific errors
+      if (stripos($change_error, 'history') !== false) {
+        $password_in_history = 1;
+      } elseif (stripos($change_error, 'current password') !== false || stripos($change_error, 'Invalid credentials') !== false) {
+        $invalid_current_password = 1;
+      } else {
+        $ppolicy_error = $change_error;
+      }
+    }
+  }
+
+  // Fall back to traditional method if ppolicy not enabled or failed
+  if (!$password_changed && !isset($password_in_history) && !isset($invalid_current_password) && !isset($ppolicy_error)) {
+    $ldap_connection = open_ldap_connection();
+    $password_changed = ldap_change_password($ldap_connection,$USER_ID,$_POST['password']);
+    if (!$password_changed) {
+      die("change_ldap_password() failed.");
+    }
+  }
+
+  if ($password_changed) {
+    render_header("$ORGANISATION_NAME account manager - password changed");
   ?>
   <div class="container">
     <div class="row justify-content-center">
@@ -36,6 +111,7 @@ if (isset($_POST['change_password'])) {
   <?php
   render_footer();
   exit(0);
+  }
  }
 
 }
@@ -57,6 +133,66 @@ if (isset($invalid_chars)) {  ?>
 if (isset($mismatched)) {  ?>
 <div class="alert alert-warning">
  <p class="text-center">The passwords didn't match.</p>
+</div>
+<?php }
+
+if (isset($missing_current_password)) {  ?>
+<div class="alert alert-warning">
+ <p class="text-center">Current password is required.</p>
+</div>
+<?php }
+
+if (isset($invalid_current_password)) {  ?>
+<div class="alert alert-warning">
+ <p class="text-center">Invalid current password.</p>
+</div>
+<?php }
+
+if (isset($password_in_history)) {  ?>
+<div class="alert alert-warning">
+ <p class="text-center">Password was used recently and cannot be reused.</p>
+</div>
+<?php }
+
+if (isset($ppolicy_error)) {  ?>
+<div class="alert alert-warning">
+ <p class="text-center">
+ <?php
+ if ($ppolicy_error == "SYSTEM_ERROR") {
+   echo "The password could not be changed due to a system configuration issue. Please contact your administrator.";
+ } else {
+   echo "Password policy error: " . htmlspecialchars($ppolicy_error);
+ }
+ ?>
+ </p>
+</div>
+<?php }
+
+// Display password expired alert
+if ($password_expired_forced) {  ?>
+<div class="alert alert-danger">
+ <p class="text-center"><strong>Your password has expired.</strong><br>
+ You must change your password to continue using your account.</p>
+</div>
+<?php }
+// Display password expiry warning (if not already expired)
+elseif ($password_expires_in_days !== null && $password_expires_in_days > 0 && $password_expires_in_days <= $PASSWORD_EXPIRY_WARNING_DAYS) { ?>
+<div class="alert alert-warning">
+ <p class="text-center"><strong>Your password expires in <?php echo $password_expires_in_days; ?> day<?php echo $password_expires_in_days != 1 ? 's' : ''; ?>.</strong><br>
+ Please change it now to avoid being locked out of your account.</p>
+</div>
+<?php }
+
+// Display password age information if available
+if ($password_age_days !== null) { ?>
+<div class="alert alert-info">
+ <p class="text-center">
+ <strong>Password Information:</strong><br>
+ Last changed: <?php echo $password_changed_formatted; ?> (<?php echo $password_age_days; ?> day<?php echo $password_age_days != 1 ? 's' : ''; ?> ago)
+ <?php if ($password_expires_in_days !== null && $password_expires_in_days > 0) { ?>
+ <br>Expires: <?php echo date('F j, Y', strtotime($password_changed_time) + ($PASSWORD_EXPIRY_DAYS * 86400)); ?>
+ <?php } ?>
+ </p>
 </div>
 <?php }
 
@@ -83,16 +219,25 @@ if (isset($mismatched)) {  ?>
    </ul>
 
    <div class="card-body text-center">
-   
+
     <form class="form-horizontal" action='' method='post'>
 
      <input type='hidden' id="change_password" name="change_password">
      <input type='hidden' id="pass_score" value="0" name="pass_score">
-     
-     <div class="row mb-3" id="password_div">
-      <label for="password" class="col-sm-4 col-form-label">Password</label>
+
+     <?php if ($PPOLICY_ENABLED) { ?>
+     <div class="row mb-3">
+      <label for="current_password" class="col-sm-4 col-form-label">Current Password</label>
       <div class="col-sm-6">
-       <input type="password" class="form-control" id="password" name="password">
+       <input type="password" class="form-control" id="current_password" name="current_password" autocomplete="current-password" required>
+      </div>
+     </div>
+     <?php } ?>
+
+     <div class="row mb-3" id="password_div">
+      <label for="password" class="col-sm-4 col-form-label">New Password</label>
+      <div class="col-sm-6">
+       <input type="password" class="form-control" id="password" name="password" autocomplete="new-password">
       </div>
      </div>
 

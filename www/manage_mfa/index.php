@@ -5,6 +5,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
 include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
 
 set_page_access("user");
 
@@ -39,22 +40,25 @@ $totp_enrolled_date = isset($user_entry[0][$enrolled_attr_lower][0]) ? $user_ent
 $backup_code_count = totp_get_backup_code_count($ldap_connection, $user_dn);
 
 // Check MFA schema status dynamically if MFA is enabled
-if ($MFA_ENABLED == TRUE) {
+if ($MFA_FEATURE_ENABLED == TRUE) {
   $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
   $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
 }
 
 // Check if user is in MFA-required group
-$user_requires_mfa = totp_user_requires_mfa($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS);
+$mfa_result = totp_user_requires_mfa($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS);
+$user_requires_mfa = $mfa_result['required'];
 $grace_period_remaining = null;
 
 if ($user_requires_mfa && $totp_status == 'pending' && $totp_enrolled_date) {
-  $grace_period_remaining = totp_grace_period_remaining($totp_enrolled_date, $MFA_GRACE_PERIOD_DAYS);
+  // Use group-specific grace period if available, otherwise use global setting
+  $grace_period = $mfa_result['grace_period'] !== null ? $mfa_result['grace_period'] : $MFA_GRACE_PERIOD_DAYS;
+  $grace_period_remaining = totp_grace_period_remaining($totp_enrolled_date, $grace_period);
 }
 
 // Check if MFA schema is available
 $schema_error = false;
-if ($MFA_ENABLED && !$MFA_SCHEMA_OK) {
+if ($MFA_FEATURE_ENABLED && !$MFA_SCHEMA_OK) {
   $schema_error = true;
 }
 
@@ -101,6 +105,8 @@ if (isset($_POST['enrol_mfa'])) {
 
       // Save to LDAP
       if (totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes)) {
+        // Audit log successful MFA enrollment
+        audit_log('mfa_enrolled', $USER_ID, 'User enrolled in MFA', 'success', $USER_ID);
         $success = true;
         $totp_status = 'active';
       }
@@ -117,6 +123,8 @@ if (isset($_POST['disable_mfa'])) {
     $error_message = "Multi-factor authentication is currently unavailable due to a configuration issue. Please contact your administrator.";
   }
   elseif (totp_disable($ldap_connection, $user_dn)) {
+    // Audit log MFA disabled
+    audit_log('mfa_disabled', $USER_ID, 'User disabled MFA', 'success', $USER_ID);
     $success_disable = true;
     $totp_status = 'disabled';
   }

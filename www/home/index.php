@@ -6,7 +6,7 @@ include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
 
 // Include TOTP functions if MFA is enabled (needed for schema check)
-if ($MFA_ENABLED == TRUE) {
+if ($MFA_FEATURE_ENABLED == TRUE) {
   include_once "totp_functions.inc.php";
 }
 
@@ -16,7 +16,7 @@ set_page_access("user");
 $ldap_connection = open_ldap_connection();
 
 // Check MFA schema status dynamically if MFA is enabled
-if ($MFA_ENABLED == TRUE) {
+if ($MFA_FEATURE_ENABLED == TRUE) {
   $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
   $MFA_FULLY_OPERATIONAL = $MFA_SCHEMA_OK;
 }
@@ -24,7 +24,7 @@ if ($MFA_ENABLED == TRUE) {
 // Check user's MFA status
 $mfa_status = array('needs_setup' => false);
 
-if ($MFA_FULLY_OPERATIONAL && !empty($MFA_REQUIRED_GROUPS)) {
+if ($MFA_FULLY_OPERATIONAL) {
   $mfa_status = totp_get_user_mfa_status($ldap_connection, $USER_ID, $MFA_REQUIRED_GROUPS, $MFA_GRACE_PERIOD_DAYS);
 }
 
@@ -44,6 +44,38 @@ render_header("$ORGANISATION_NAME account manager");
       <?php endif; ?>
     </p>
     <p>Please click on "Manage MFA" below to set up your authenticator app.</p>
+  </div>
+  <?php endif; ?>
+
+  <?php
+  // Check password expiry status
+  if (isset($_SESSION['password_should_warn']) && $_SESSION['password_should_warn'] === true && isset($_SESSION['password_days_remaining'])):
+    $days_remaining = $_SESSION['password_days_remaining'];
+  ?>
+  <div class="alert alert-warning">
+    <h4><strong>Password Expiry Warning</strong></h4>
+    <p>
+      Your password expires in <strong><?php echo $days_remaining; ?> day<?php echo $days_remaining != 1 ? 's' : ''; ?></strong>.
+      Please change it now to avoid being locked out of your account.
+    </p>
+    <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-warning">Change Password Now</a>
+  </div>
+  <?php endif; ?>
+
+  <?php
+  // Check account expiration status
+  if (isset($_SESSION['account_should_warn']) && $_SESSION['account_should_warn'] === true && isset($_SESSION['account_days_remaining'])):
+    $account_days_remaining = $_SESSION['account_days_remaining'];
+  ?>
+  <div class="alert alert-danger">
+    <h4><strong>Account Expiring Soon</strong></h4>
+    <p>
+      Your account will expire in <strong><?php echo $account_days_remaining; ?> day<?php echo $account_days_remaining != 1 ? 's' : ''; ?></strong>.
+      Please contact your system administrator to request an account extension.
+    </p>
+    <?php if (!empty($SUPPORT_EMAIL)): ?>
+    <p><strong>Support Contact:</strong> <a href="mailto:<?php echo htmlspecialchars($SUPPORT_EMAIL); ?>" class="text-white"><u><?php echo htmlspecialchars($SUPPORT_EMAIL); ?></u></a></p>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 

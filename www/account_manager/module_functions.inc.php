@@ -6,21 +6,26 @@
 
 function render_submenu() {
 
-  global $THIS_MODULE_PATH, $MFA_ENABLED;
+  global $THIS_MODULE_PATH, $MFA_FEATURE_ENABLED, $AUDIT_ENABLED;
 
   $submodules = array( 'users' => 'index.php',
                        'groups' => 'groups.php'
                      );
 
-  if ($MFA_ENABLED == TRUE) {
+  if ($MFA_FEATURE_ENABLED == TRUE) {
     $submodules['mfa_status'] = 'mfa_status.php';
+  }
+
+  if ($AUDIT_ENABLED == TRUE) {
+    $submodules['audit_logs'] = 'audit_logs.php';
   }
 
   // Submodule display names (optional - if not set, ucwords of key is used)
   $submodule_names = array(
     'users' => 'Users',
     'groups' => 'Groups',
-    'mfa_status' => 'MFA Status'
+    'mfa_status' => 'MFA Status',
+    'audit_logs' => 'Audit Logs'
   );
 
   ?>

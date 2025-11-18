@@ -367,7 +367,7 @@ sudo systemctl restart nginx
 
 ### Load Environment Variables in PHP
 
-Modify `/var/www/luminary/includes/config.inc.php` to load from the configuration file:
+Modify `/var/www/luminary/includes/config_registry.inc.php` to load from the configuration file:
 
 Add at the beginning of the file:
 
