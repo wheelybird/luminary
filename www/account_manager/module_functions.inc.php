@@ -24,8 +24,8 @@ function render_submenu() {
   $submodule_names = array(
     'users' => 'Users',
     'groups' => 'Groups',
-    'mfa_status' => 'MFA Status',
-    'audit_logs' => 'Audit Logs'
+    'mfa_status' => 'MFA status',
+    'audit_logs' => 'Audit logs'
   );
 
   ?>

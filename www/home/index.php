@@ -36,7 +36,7 @@ render_header("$ORGANISATION_NAME account manager");
 
   <?php if ($mfa_status['needs_setup']): ?>
   <div class="alert alert-warning">
-    <h4><strong>Action Required: Multi-Factor Authentication</strong></h4>
+    <h4><strong>Action required: multi-factor authentication</strong></h4>
     <p>
       Your account requires multi-factor authentication (MFA) to be set up.
       <?php if ($mfa_status['days_remaining'] !== null): ?>
@@ -53,12 +53,12 @@ render_header("$ORGANISATION_NAME account manager");
     $days_remaining = $_SESSION['password_days_remaining'];
   ?>
   <div class="alert alert-warning">
-    <h4><strong>Password Expiry Warning</strong></h4>
+    <h4><strong>Password expiry warning</strong></h4>
     <p>
       Your password expires in <strong><?php echo $days_remaining; ?> day<?php echo $days_remaining != 1 ? 's' : ''; ?></strong>.
       Please change it now to avoid being locked out of your account.
     </p>
-    <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-warning">Change Password Now</a>
+    <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-warning">Change password now</a>
   </div>
   <?php endif; ?>
 
@@ -68,7 +68,7 @@ render_header("$ORGANISATION_NAME account manager");
     $account_days_remaining = $_SESSION['account_days_remaining'];
   ?>
   <div class="alert alert-danger">
-    <h4><strong>Account Expiring Soon</strong></h4>
+    <h4><strong>Account expiring soon</strong></h4>
     <p>
       Your account will expire in <strong><?php echo $account_days_remaining; ?> day<?php echo $account_days_remaining != 1 ? 's' : ''; ?></strong>.
       Please contact your system administrator to request an account extension.
@@ -92,11 +92,11 @@ render_header("$ORGANISATION_NAME account manager");
     <div class="col-md-6">
       <div class="card">
         <div class="card-header">
-          <h3>Change Password</h3>
+          <h4>Change password</h4>
         </div>
         <div class="card-body">
           <p>Update your account password.</p>
-          <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">Change Password</a>
+          <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">Change password</a>
         </div>
       </div>
     </div>
@@ -106,16 +106,16 @@ render_header("$ORGANISATION_NAME account manager");
     <div class="col-md-6">
       <div class="card <?php echo $mfa_status['needs_setup'] ? 'border-warning' : ''; ?>">
         <div class="card-header <?php echo $mfa_status['needs_setup'] ? 'bg-warning text-dark' : ''; ?>">
-          <h3>
+          <h4>
             Manage MFA
             <?php if ($mfa_status['needs_setup']): ?>
               <span class="badge bg-warning text-dark float-end">Required</span>
             <?php endif; ?>
-          </h3>
+          </h4>
         </div>
         <div class="card-body">
           <?php if ($mfa_status['needs_setup']): ?>
-            <p><strong>Action Required:</strong> Set up multi-factor authentication for your account.</p>
+            <p><strong>Action required:</strong> Set up multi-factor authentication for your account.</p>
           <?php else: ?>
             <p>Set up or manage multi-factor authentication (MFA) for your account.</p>
           <?php endif; ?>
@@ -129,11 +129,11 @@ render_header("$ORGANISATION_NAME account manager");
     <div class="col-md-6">
       <div class="card">
         <div class="card-header">
-          <h3>Account Manager</h3>
+          <h4>Account manager</h4>
         </div>
         <div class="card-body">
           <p>Manage user accounts, groups, and system settings.</p>
-          <a href="<?php echo $SERVER_PATH; ?>account_manager" class="btn btn-success">Account Manager</a>
+          <a href="<?php echo $SERVER_PATH; ?>account_manager" class="btn btn-success">Account manager</a>
         </div>
       </div>
     </div>
@@ -143,11 +143,11 @@ render_header("$ORGANISATION_NAME account manager");
     <div class="col-md-6">
       <div class="card">
         <div class="card-header">
-          <h3>System Config</h3>
+          <h4>System config</h4>
         </div>
         <div class="card-body">
           <p>View complete system configuration and settings.</p>
-          <a href="<?php echo $SERVER_PATH; ?>system_config" class="btn btn-info">System Config</a>
+          <a href="<?php echo $SERVER_PATH; ?>system_config" class="btn btn-info">System config</a>
         </div>
       </div>
     </div>

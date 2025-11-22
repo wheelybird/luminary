@@ -336,7 +336,7 @@ docker exec luminary printenv | grep PASSWORD_POLICY
 
 ### Self-service password change requires current password
 
-**Cause:** This is expected behavior when PPOLICY_ENABLED=true
+**Cause:** This is expected behaviour when PPOLICY_ENABLED=true
 
 **Explanation:** When ppolicy is enabled, Luminary must bind as the user (not admin) to trigger ppolicy enforcement. This requires the user's current password for authentication.
 
@@ -349,5 +349,6 @@ docker exec luminary printenv | grep PASSWORD_POLICY
 ## See Also
 
 - [MFA Documentation](mfa.md) - Multi-factor authentication setup
+- [Audit Logging Documentation](audit_logging.md) - Track password changes
+- [Account Lifecycle Documentation](account_lifecycle.md) - Account expiration management
 - [Configuration Reference](configuration.md) - All available settings
-- [Audit Logging](../README.md#audit-logging) - Track password changes

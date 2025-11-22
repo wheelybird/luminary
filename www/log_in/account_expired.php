@@ -41,7 +41,7 @@ if ($user_search) {
 
 ldap_close($ldap_connection);
 
-render_header("$ORGANISATION_NAME account manager - Account Expired");
+render_header("$ORGANISATION_NAME account manager - Account expired");
 
 ?>
 <div class="container">
@@ -51,7 +51,7 @@ render_header("$ORGANISATION_NAME account manager - Account Expired");
       <div class="card border-danger">
         <div class="card-header bg-danger text-white text-center">
           <h4 class="card-title mb-0">
-            <i class="bi bi-exclamation-triangle-fill"></i> Account Expired
+            <i class="bi bi-exclamation-triangle-fill"></i> Account expired
           </h4>
         </div>
         <div class="card-body">

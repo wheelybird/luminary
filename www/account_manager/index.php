@@ -14,6 +14,14 @@ render_submenu();
 
 $ldap_connection = open_ldap_connection();
 
+// Get pagination parameters
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$per_page = $PAGINATION_ITEMS_PER_PAGE;
+$offset = ($page - 1) * $per_page;
+
+// Get search filter
+$filter = isset($_GET['filter']) ? trim($_GET['filter']) : '';
+
 if (isset($_POST['delete_user'])) {
 
   $this_user = $_POST['delete_user'];
@@ -35,14 +43,53 @@ if (isset($_POST['delete_user'])) {
 
 }
 
-$people = ldap_get_user_list($ldap_connection);
+// Get all users matching filter (for total count)
+$all_people = ldap_get_user_list($ldap_connection);
+
+// Apply search filter if provided
+if (!empty($filter)) {
+  $all_people = array_filter($all_people, function($attribs, $account) use ($filter) {
+    $search_string = strtolower($account . ' ' .
+                                 ($attribs['givenname'] ?? '') . ' ' .
+                                 ($attribs['sn'] ?? '') . ' ' .
+                                 ($attribs['mail'] ?? ''));
+    return strpos($search_string, strtolower($filter)) !== false;
+  }, ARRAY_FILTER_USE_BOTH);
+}
+
+// Calculate pagination
+$total_users = count($all_people);
+$total_pages = ceil($total_users / $per_page);
+
+// Get paginated subset
+$people = array_slice($all_people, $offset, $per_page, true);
 
 ?>
 <div class="container">
- <form action="<?php print $THIS_MODULE_PATH; ?>/new_user.php" method="post">
-  <button type="button" class="btn btn-light"><?php print count($people);?> account<?php if (count($people) != 1) { print "s"; }?></button>  &nbsp; <button id="add_group" class="btn btn-secondary" type="submit">New user</button>
- </form> 
- <input class="form-control" id="search_input" type="text" placeholder="Search..">
+ <div class="row mb-3">
+   <div class="col-md-6">
+     <form action="<?php print $THIS_MODULE_PATH; ?>/new_user.php" method="post" class="d-inline">
+       <button type="button" class="btn btn-light"><?php print number_format($total_users);?> account<?php if ($total_users != 1) { print "s"; }?></button>
+       <button id="add_group" class="btn btn-secondary" type="submit">New user</button>
+     </form>
+   </div>
+   <div class="col-md-6">
+     <form action="" method="get" class="d-flex">
+       <input class="form-control me-2" id="search_input" name="filter" type="text" placeholder="Search users..." value="<?php echo htmlspecialchars($filter); ?>">
+       <button type="submit" class="btn btn-primary">Search</button>
+       <?php if (!empty($filter)) { ?>
+         <a href="?" class="btn btn-secondary ms-2">Clear</a>
+       <?php } ?>
+     </form>
+   </div>
+ </div>
+
+ <?php if (!empty($filter)) { ?>
+   <div class="alert alert-info">
+     Showing <?php echo count($people); ?> of <?php echo number_format($total_users); ?> users matching "<?php echo htmlspecialchars($filter); ?>"
+   </div>
+ <?php } ?>
+
  <table class="table table-striped">
   <thead>
    <tr>
@@ -50,27 +97,11 @@ $people = ldap_get_user_list($ldap_connection);
      <th>First name</th>
      <th>Last name</th>
      <th>Email</th>
-     <th>Member of</th>
    </tr>
   </thead>
  <tbody id="userlist">
-   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const searchInput = document.getElementById('search_input');
-      searchInput.addEventListener('keyup', function() {
-        const value = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#userlist tr');
-        rows.forEach(function(row) {
-          const text = row.textContent.toLowerCase();
-          row.style.display = text.indexOf(value) > -1 ? '' : 'none';
-        });
-      });
-    });
-  </script>
 <?php
 foreach ($people as $account_identifier => $attribs){
-
-  $group_membership = ldap_user_group_membership($ldap_connection,$account_identifier);
   $this_mail = isset($people[$account_identifier]['mail']) ? $people[$account_identifier]['mail'] : "";
   $this_givenname = isset($people[$account_identifier]['givenname']) ? $people[$account_identifier]['givenname'] : "";
   $this_sn = isset($people[$account_identifier]['sn']) ? $people[$account_identifier]['sn'] : "";
@@ -79,13 +110,68 @@ foreach ($people as $account_identifier => $attribs){
   print "   <td>" . htmlspecialchars($this_givenname) . "</td>\n";
   print "   <td>" . htmlspecialchars($this_sn) . "</td>\n";
   print "   <td>" . htmlspecialchars($this_mail) . "</td>\n";
-  print "   <td>" . htmlspecialchars(implode(", ", $group_membership)) . "</td>\n";
   print " </tr>\n";
+}
 
+if (count($people) == 0) {
+  print " <tr><td colspan='4' class='text-center text-muted'>No users found</td></tr>\n";
 }
 ?>
   </tbody>
  </table>
+
+ <!-- Pagination -->
+ <?php if ($total_pages > 1) { ?>
+   <nav aria-label="User list pagination" class="mt-3">
+     <ul class="pagination justify-content-center">
+       <!-- Previous -->
+       <li class="page-item <?php if ($page <= 1) echo 'disabled'; ?>">
+         <a class="page-link" href="?page=<?php echo $page - 1; ?><?php if (!empty($filter)) echo '&filter=' . urlencode($filter); ?>">Previous</a>
+       </li>
+
+       <!-- Page numbers -->
+       <?php
+       $start_page = max(1, $page - 5);
+       $end_page = min($total_pages, $page + 5);
+
+       if ($start_page > 1) {
+         echo '<li class="page-item"><a class="page-link" href="?page=1';
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">1</a></li>';
+         if ($start_page > 2) {
+           echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+         }
+       }
+
+       for ($i = $start_page; $i <= $end_page; $i++) {
+         $active = ($i == $page) ? 'active' : '';
+         echo '<li class="page-item ' . $active . '"><a class="page-link" href="?page=' . $i;
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">' . $i . '</a></li>';
+       }
+
+       if ($end_page < $total_pages) {
+         if ($end_page < $total_pages - 1) {
+           echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+         }
+         echo '<li class="page-item"><a class="page-link" href="?page=' . $total_pages;
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">' . $total_pages . '</a></li>';
+       }
+       ?>
+
+       <!-- Next -->
+       <li class="page-item <?php if ($page >= $total_pages) echo 'disabled'; ?>">
+         <a class="page-link" href="?page=<?php echo $page + 1; ?><?php if (!empty($filter)) echo '&filter=' . urlencode($filter); ?>">Next</a>
+       </li>
+     </ul>
+   </nav>
+
+   <p class="text-center text-muted">
+     Page <?php echo $page; ?> of <?php echo number_format($total_pages); ?>
+     (Showing <?php echo (($page - 1) * $per_page) + 1; ?>-<?php echo min($page * $per_page, $total_users); ?> of <?php echo number_format($total_users); ?>)
+   </p>
+ <?php } ?>
 </div>
 <?php
 

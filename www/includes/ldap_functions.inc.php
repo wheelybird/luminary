@@ -1231,23 +1231,23 @@ function validate_username($username) {
 }
 
 /**
- * Sanitize value for LDAP storage
+ * Sanitise value for LDAP storage
  *
- * @param string $value The value to sanitize
- * @return string The sanitized value safe for LDAP
+ * @param string $value The value to sanitise
+ * @return string The sanitised value safe for LDAP
  */
-function sanitize_for_ldap($value) {
+function sanitise_for_ldap($value) {
     $value = trim($value);
     return ldap_escape($value, '', LDAP_ESCAPE_DN);
 }
 
 /**
- * Sanitize value for HTML display
+ * Sanitise value for HTML display
  *
- * @param string $value The value to sanitize
- * @return string The sanitized value safe for HTML
+ * @param string $value The value to sanitise
+ * @return string The sanitised value safe for HTML
  */
-function sanitize_for_html($value) {
+function sanitise_for_html($value) {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 

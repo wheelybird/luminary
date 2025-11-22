@@ -9,10 +9,7 @@ include_once "audit_functions.inc.php";
 include_once "module_functions.inc.php";
 set_page_access("admin");
 
-render_header("$ORGANISATION_NAME account manager");
-render_submenu();
-
-// Handle CSV export
+// Handle CSV export BEFORE any output
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
   $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
   $result_filter = isset($_GET['result']) ? $_GET['result'] : 'all';
@@ -27,6 +24,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
   echo $csv_content;
   exit;
 }
+
+render_header("$ORGANISATION_NAME account manager");
+render_submenu();
 
 // Handle cleanup action
 if (isset($_POST['cleanup']) && $_POST['cleanup'] === '1') {
@@ -51,10 +51,10 @@ $result_filter = isset($_GET['result']) ? $_GET['result'] : 'all';
 if (!$AUDIT_ENABLED) {
   ?>
   <div class="container">
-    <h2><i class="bi bi-journal-text"></i> Audit Logs</h2>
+    <h2><i class="bi bi-journal-text"></i> Audit logs</h2>
 
     <div class="alert alert-warning">
-      <h5><i class="bi bi-exclamation-triangle"></i> Audit Logging Disabled</h5>
+      <h5><i class="bi bi-exclamation-triangle"></i> Audit logging disabled</h5>
       <p>Audit logging is currently disabled. To enable audit logging, set the following environment variable:</p>
       <p><code>AUDIT_ENABLED=TRUE</code></p>
       <p><strong>For Docker deployments (recommended):</strong></p>
@@ -65,14 +65,14 @@ if (!$AUDIT_ENABLED) {
 
     <div class="card">
       <div class="card-header">
-        <h5 class="card-title mb-0">What Gets Logged?</h5>
+        <h5 class="card-title mb-0">What gets logged?</h5>
       </div>
       <div class="card-body">
         <p>When audit logging is enabled, the following events are recorded:</p>
         <ul>
           <li><strong>User Management:</strong> User creation, deletion, attribute changes</li>
           <li><strong>Group Management:</strong> Group creation, deletion, membership changes</li>
-          <li><strong>MFA Events:</strong> MFA enrollment, verification, backup code generation</li>
+          <li><strong>MFA Events:</strong> MFA enrolment, verification, backup code generation</li>
           <li><strong>Authentication:</strong> Login attempts (success and failure), logout</li>
           <li><strong>Security:</strong> Password changes, account lockouts, permission changes</li>
         </ul>
@@ -97,13 +97,13 @@ $total_pages = ceil($total_entries / $per_page);
 
 <div class="container-fluid">
 
-  <h2><i class="bi bi-journal-text"></i> Audit Logs</h2>
+  <h2><i class="bi bi-journal-text"></i> Audit logs</h2>
   <p class="text-muted">Security and administrative event logging</p>
 
   <?php if ($using_stdout) { ?>
   <!-- Docker STDOUT Mode Info -->
   <div class="alert alert-info">
-    <h5><i class="bi bi-info-circle"></i> Docker Logging Mode</h5>
+    <h5><i class="bi bi-info-circle"></i> Docker logging mode</h5>
     <p>Audit logs are being written to <strong>STDOUT</strong> for Docker log management.</p>
     <p class="mb-2"><strong>To view audit logs:</strong></p>
     <pre class="mb-2" style="background: #f8f9fa; padding: 10px; border-radius: 5px;"><code># View all container logs (including audit entries)
@@ -129,7 +129,7 @@ docker logs luminary > luminary-audit.log 2>&1</code></pre>
     <div class="col-md-6">
       <div class="card">
         <div class="card-body">
-          <h6 class="card-title">Log Statistics</h6>
+          <h6 class="card-title">Log statistics</h6>
           <?php if ($using_stdout) { ?>
             <p class="mb-1"><strong>Mode:</strong> <span class="badge bg-info">Docker STDOUT</span></p>
             <p class="mb-1"><strong>View Logs:</strong> <code>docker logs luminary</code></p>
@@ -217,7 +217,7 @@ docker logs luminary > luminary-audit.log 2>&1</code></pre>
     <div class="card">
       <div class="card-header">
         <h5 class="card-title mb-0">
-          Audit Log Entries
+          Audit log entries
           <?php if (!empty($filter) || $result_filter !== 'all') { ?>
             <span class="badge bg-primary"><?php echo number_format($total_entries); ?> matching</span>
           <?php } ?>

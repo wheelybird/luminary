@@ -138,7 +138,7 @@ foreach ($people as $username => $attribs) {
 
 <div class="container">
 
-  <h2>MFA Status Overview</h2>
+  <h2>MFA status overview</h2>
 
   <!-- Statistics Cards -->
   <div class="row" style="margin-bottom: 20px;">
@@ -195,12 +195,12 @@ foreach ($people as $username => $attribs) {
   <!-- Configuration Summary -->
   <div class="card">
     <div class="card-header">
-      <h4 class="card-title">MFA Configuration</h4>
+      <h4 class="card-title">MFA configuration</h4>
     </div>
     <div class="card-body">
       <table class="table table-condensed">
         <tr>
-          <th>MFA Enabled:</th>
+          <th style="width: 200px;">MFA Enabled:</th>
           <td><?php echo $MFA_FEATURE_ENABLED ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'; ?></td>
         </tr>
         <?php if ($MFA_FEATURE_ENABLED && !empty($MFA_REQUIRED_GROUPS)) { ?>
@@ -224,7 +224,7 @@ foreach ($people as $username => $attribs) {
   <!-- User List -->
   <div class="card">
     <div class="card-header">
-      <h4 class="card-title">User MFA Status</h4>
+      <h4 class="card-title">User MFA status</h4>
     </div>
     <div class="card-body">
       <input class="form-control" id="search_input" type="text" placeholder="Search users...">

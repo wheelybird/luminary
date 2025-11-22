@@ -846,7 +846,7 @@ Debug logs may expose sensitive information.
 
 ### MFA Not Working
 
-**Problem:** MFA enrollment or validation fails
+**Problem:** MFA enrolment or validation fails
 
 **Solutions:**
 

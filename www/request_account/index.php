@@ -136,35 +136,35 @@ EoT;
    <form class="form-horizontal" action='' method='post'>
 
     <div class="row mb-3">
-     <label for="firstname" class="col-sm-4 col-form-label">First name</label>
+     <label for="firstname" class="col-sm-4 col-form-label text-end">First name</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="firstname" name="firstname" placeholder="Required" <?php if (isset($firstname)) { print "value='$firstname'"; } ?>>
      </div>
     </div>
 
     <div class="row mb-3">
-     <label for="lastname" class="col-sm-4 col-form-label">Last name</label>
+     <label for="lastname" class="col-sm-4 col-form-label text-end">Last name</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="lastname" name="lastname" placeholder="Required" <?php if (isset($lastname)) { print "value='$lastname'"; } ?>>
      </div>
     </div>
 
     <div class="row mb-3">
-     <label for="email" class="col-sm-4 col-form-label">Email</label>
+     <label for="email" class="col-sm-4 col-form-label text-end">Email</label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="email" name="email" <?php if (isset($email)) { print "value='$email'"; } ?>>
      </div>
     </div>
 
     <div class="row mb-3">
-     <label for="Notes" class="col-sm-4 col-form-label">Notes</label>
+     <label for="Notes" class="col-sm-4 col-form-label text-end">Notes</label>
      <div class="col-sm-6">
       <textarea class="form-control" id="notes" name="notes" placeholder="Enter any extra information you think the administrator might need to know."><?php if (isset($notes)) { print $notes; } ?></textarea>
      </div>
     </div>
 
     <div class="row mb-3">
-     <label for="validate" class="col-sm-4 col-form-label">Validation</label>
+     <label for="validate" class="col-sm-4 col-form-label text-end">Validation</label>
      <div class="col-sm-6">
       <span class="center-block">
         <img src="human.php" class="human-check" alt="Non-human detection">
@@ -176,7 +176,7 @@ EoT;
      </div>
     </div>
 
-    <div class="row mb-3">
+    <div class="text-center mb-3">
      <button type="submit" class="btn btn-secondary">Send request</button>
     </div>
    

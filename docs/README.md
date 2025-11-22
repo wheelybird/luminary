@@ -20,6 +20,9 @@ This directory contains documentation for the Luminary LDAP User Manager.
   - Organized by category with defaults, types, and environment variables
 
 - **[mfa.md](mfa.md)** - Multi-factor authentication guide
+- **[password_policy.md](password_policy.md)** - Password policy enforcement (complexity, history, expiry)
+- **[audit_logging.md](audit_logging.md)** - Audit logging and security event tracking
+- **[account_lifecycle.md](account_lifecycle.md)** - Account expiration and lifecycle management
 - **[advanced.md](advanced.md)** - Advanced topics and customization
 - **[non-docker.md](non-docker.md)** - Running Luminary without Docker
 
@@ -37,6 +40,9 @@ Use **[configuration.md](configuration.md)** - It's a comprehensive auto-generat
 
 ### For Advanced Features
 - MFA/TOTP: See **[mfa.md](mfa.md)**
+- Password Policy: See **[password_policy.md](password_policy.md)**
+- Audit Logging: See **[audit_logging.md](audit_logging.md)**
+- Account Lifecycle: See **[account_lifecycle.md](account_lifecycle.md)**
 - Custom schemas, objectClasses: See **[advanced.md](advanced.md)**
 
 ## Regenerating Configuration Documentation
@@ -76,7 +82,7 @@ This page shows:
 - All current configuration values
 - Highlight of values changed from defaults
 - Search and filter capabilities
-- Categories organized by feature area
+- Categories organised by feature area
 
 ## Configuration Registry
 

@@ -378,9 +378,20 @@ $tabindex=1;
 <script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
 <script>
 
- // Initialize password strength meter
+ // Initialize password requirements checker or strength meter
  document.addEventListener('DOMContentLoaded', function() {
+   <?php if ($PASSWORD_POLICY_ENABLED) { ?>
+   window.passwordRequirements = {
+     minLength: <?php echo (int)$PASSWORD_MIN_LENGTH; ?>,
+     requireUppercase: <?php echo $PASSWORD_REQUIRE_UPPERCASE ? 'true' : 'false'; ?>,
+     requireLowercase: <?php echo $PASSWORD_REQUIRE_LOWERCASE ? 'true' : 'false'; ?>,
+     requireNumbers: <?php echo $PASSWORD_REQUIRE_NUMBERS ? 'true' : 'false'; ?>,
+     requireSpecial: <?php echo $PASSWORD_REQUIRE_SPECIAL ? 'true' : 'false'; ?>
+   };
+   initPasswordRequirements('password', window.passwordRequirements);
+   <?php } else { ?>
    initPasswordStrength('password');
+   <?php } ?>
  });
 
  function check_passwords_match() {
@@ -433,7 +444,7 @@ $tabindex=1;
 <?php render_dynamic_field_js(); ?>
 
 <div class="container">
- <div class="col-sm-8 offset-md-2">
+ <div class="col-md-8 offset-md-2">
 
   <div class="card">
    <div class="card-header text-center"><?php print $page_title; ?></div>
@@ -484,15 +495,26 @@ $tabindex=1;
       </div>
 <?php } ?>
 
-     <div class="row mb-3">
+     <div class="text-center mb-3">
        <button tabindex="<?php print $tabindex+5; ?>" type="submit" class="btn btn-warning">Create account</button>
      </div>
 
     </form>
 
+    <?php if ($PASSWORD_POLICY_ENABLED) { ?>
+    <!-- Password Requirements Checklist -->
+    <div class="card mt-3">
+      <div class="card-header"><small><strong>Password requirements</strong></small></div>
+      <div class="card-body" id="PasswordRequirements">
+        <!-- Requirements will be dynamically inserted here -->
+      </div>
+    </div>
+    <?php } else { ?>
+    <!-- Password Strength Meter (fallback when policy not enabled) -->
     <div class="progress">
      <div id="StrengthProgressBar" class="progress-bar"></div>
     </div>
+    <?php } ?>
 
     <div><sup>&ast;</sup>The account identifier</div>
 

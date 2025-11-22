@@ -20,12 +20,12 @@
  $MODULE_NAMES = array(
                     'log_in'          => 'Log In',
                     'home'            => 'Home',
-                    'user_profile'    => 'My Profile',
-                    'change_password' => 'Change Password',
-                    'account_manager' => 'Account Manager',
-                    'system_config'   => 'System Config',
+                    'user_profile'    => 'My profile',
+                    'change_password' => 'Change password',
+                    'account_manager' => 'Account manager',
+                    'system_config'   => 'System config',
                     'log_out'         => 'Log Out',
-                    'request_account' => 'Request Account',
+                    'request_account' => 'Request account',
                     'manage_mfa'      => 'Manage MFA',
                   );
 

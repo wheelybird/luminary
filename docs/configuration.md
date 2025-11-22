@@ -6,18 +6,18 @@ This document provides a comprehensive reference for all configuration options i
 To update this file, run: `php docs/generate_config_docs.php`
 
 ## Table of Contents
-- [LDAP Directory Settings](#ldap-directory-settings)
-- [User Account Defaults](#user-account-defaults)
-- [Multi-Factor Authentication](#multi-factor-authentication)
-- [User Profile Settings](#user-profile-settings)
-- [Email Settings](#email-settings)
-- [Interface & Branding](#interface-&-branding)
-- [Session & Security](#session-&-security)
-- [Audit Logging 🔧](#audit-logging)
-- [Password Policy 🔧](#password-policy)
-- [Account Lifecycle 🔧](#account-lifecycle)
-- [Advanced Group Management 🔧](#advanced-group-management)
-- [Debug & Logging](#debug-&-logging)
+- [LDAP settings](#ldap-settings)
+- [User account defaults](#user-account-defaults)
+- [Multi-factor authentication](#multi-factor-authentication)
+- [User profile settings](#user-profile-settings)
+- [Email settings](#email-settings)
+- [Interface & branding](#interface-&-branding)
+- [Session & security](#session-&-security)
+- [Audit logging 🔧](#audit-logging)
+- [Password policy 🔧](#password-policy)
+- [Account lifecycle 🔧](#account-lifecycle)
+- [Advanced group management 🔧](#advanced-group-management)
+- [Debug & logging](#debug-&-logging)
 
 ---
 
@@ -31,7 +31,7 @@ To update this file, run: `php docs/generate_config_docs.php`
 
 ---
 
-## LDAP Directory Settings
+## LDAP settings
 
 Connection settings and directory structure configuration
 
@@ -41,8 +41,8 @@ Connection settings and directory structure configuration
 | LDAP base distinguished name<br><small>Example: dc=example,dc=com</small> | string | ⚠️ *Required* | `LDAP_BASE_DN` | LDAP base distinguished name |
 | Admin bind DN for LDAP operations<br><small>Full DN of admin account with write permissions</small> | string | ⚠️ *Required* | `LDAP_ADMIN_BIND_DN` | Admin bind DN for LDAP operations |
 | Admin bind password<br><small>Password for admin bind DN</small> | string | ⚠️ *Required* | `LDAP_ADMIN_BIND_PWD` | Admin bind password |
-| Organizational unit for user accounts<br><small>OU name only (without base DN)</small> | string | 📝 `people` | `LDAP_USER_OU` | Organizational unit for user accounts |
-| Organizational unit for groups<br><small>OU name only (without base DN)</small> | string | 📝 `groups` | `LDAP_GROUP_OU` | Organizational unit for groups |
+| Organisational unit for user accounts<br><small>OU name only (without base DN)</small> | string | 📝 `people` | `LDAP_USER_OU` | Organisational unit for user accounts |
+| Organisational unit for groups<br><small>OU name only (without base DN)</small> | string | 📝 `groups` | `LDAP_GROUP_OU` | Organisational unit for groups |
 | Group name for administrators<br><small>Members of this group have admin access to Luminary</small> | string | 📝 `admins` | `LDAP_ADMINS_GROUP` | Group name for administrators |
 | Attribute used for user account identifier<br><small>Typically uid or cn</small> | string | 📝 `uid` | `LDAP_ACCOUNT_ATTRIBUTE` | Attribute used for user account identifier |
 | Attribute used for group identifier<br><small>Typically cn</small> | string | 📝 `cn` | `LDAP_GROUP_ATTRIBUTE` | Attribute used for group identifier |
@@ -84,7 +84,7 @@ Password for admin bind DN
 
 ---
 
-#### Organizational unit for user accounts
+#### Organisational unit for user accounts
 
 OU name only (without base DN)
 
@@ -94,7 +94,7 @@ OU name only (without base DN)
 
 ---
 
-#### Organizational unit for groups
+#### Organisational unit for groups
 
 OU name only (without base DN)
 
@@ -165,9 +165,9 @@ Use groupOfNames instead of posixGroup
 ---
 
 
-## User Account Defaults
+## User account defaults
 
-Default values and behavior for new user accounts
+Default values and behaviour for new user accounts
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
@@ -270,35 +270,38 @@ Domain used when auto-generating user email addresses
 ---
 
 
-## Multi-Factor Authentication
+## Multi-factor authentication
 
 TOTP/MFA configuration and enforcement policies
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
-| Enable MFA/TOTP features<br><small>Requires TOTP schema to be installed in LDAP</small> | ✅ boolean | `FALSE` | `MFA_ENABLED` | Enable MFA/TOTP features |
-| Groups that require MFA enrollment<br><small>Comma-separated list of group names</small> | 🔢 array | `[]` (empty) | `MFA_REQUIRED_GROUPS` | Groups that require MFA enrollment |
-| Grace period for MFA enrollment<br><small>Days users have to set up MFA after being added to required group</small> | integer | 📝 `7` | `MFA_GRACE_PERIOD_DAYS` | Grace period for MFA enrollment |
-| TOTP issuer name<br><small>Displayed in authenticator apps (e.g., "Example Ltd VPN")</small> | string | 📝 `LDAP` | `MFA_TOTP_ISSUER` | TOTP issuer name |
+| Enable MFA management features<br><small>Allows creating and managing MFA settings in LDAP. Requires TOTP schema to be installed.</small> | ✅ boolean | `FALSE` | `MFA_FEATURE_ENABLED` | Enable MFA management features |
+| Groups that require MFA enrolment<br><small>Comma-separated list of group names</small> | 🔢 array | `[]` (empty) | `MFA_REQUIRED_GROUPS` | Groups that require MFA enrolment |
+| Grace period for MFA enrolment<br><small>Days users have to set up MFA after being added to required group</small> | integer | 📝 `7` | `MFA_GRACE_PERIOD_DAYS` | Grace period for MFA enrolment |
+| TOTP issuer name<br><small>Displayed in authenticator apps (e.g., "Example Ltd")</small> | string | 📝 `Luminary` | `MFA_TOTP_ISSUER` | TOTP issuer name |
 | LDAP attribute for TOTP secret<br><small>Only change if using custom schema</small> | string | 📝 `totpSecret` | `TOTP_SECRET_ATTRIBUTE` | LDAP attribute for TOTP secret |
 | LDAP attribute for MFA status<br><small>Values: none, pending, active, disabled</small> | string | 📝 `totpStatus` | `TOTP_STATUS_ATTRIBUTE` | LDAP attribute for MFA status |
-| LDAP attribute for enrollment date<br><small>Used for grace period calculation</small> | string | 📝 `totpEnrolledDate` | `TOTP_ENROLLED_DATE_ATTRIBUTE` | LDAP attribute for enrollment date |
+| LDAP attribute for enrolment date<br><small>Used for grace period calculation</small> | string | 📝 `totpEnrolledDate` | `TOTP_ENROLLED_DATE_ATTRIBUTE` | LDAP attribute for enrolment date |
 | LDAP attribute for backup codes<br><small>Multi-valued attribute for recovery codes</small> | string | 📝 `totpScratchCode` | `TOTP_SCRATCH_CODES_ATTRIBUTE` | LDAP attribute for backup codes |
 | LDAP objectClass for MFA users<br><small>Only change if using custom schema</small> | string | 📝 `totpUser` | `TOTP_OBJECTCLASS` | LDAP objectClass for MFA users |
+| LDAP objectClass for groups with MFA policies<br><small>Auxiliary object class for groups. Use this if not using ldap-totp-schema.</small> | string | 📝 `mfaGroup` | `GROUP_MFA_OBJECTCLASS` | LDAP objectClass for groups with MFA policies |
+| LDAP attribute for group MFA requirement flag<br><small>Boolean attribute (TRUE/FALSE) indicating if group requires MFA</small> | string | 📝 `mfaRequired` | `GROUP_MFA_REQUIRED_ATTRIBUTE` | LDAP attribute for group MFA requirement flag |
+| LDAP attribute for group MFA grace period<br><small>Integer attribute for grace period in days</small> | string | 📝 `mfaGracePeriodDays` | `GROUP_MFA_GRACE_PERIOD_ATTRIBUTE` | LDAP attribute for group MFA grace period |
 
 ### Details
 
-#### Enable MFA/TOTP features
+#### Enable MFA management features
 
-Requires TOTP schema to be installed in LDAP
+Allows creating and managing MFA settings in LDAP. Requires TOTP schema to be installed.
 
-**Environment Variable:** `MFA_ENABLED`
+**Environment Variable:** `MFA_FEATURE_ENABLED`
 
 **Default:** `FALSE`
 
 ---
 
-#### Groups that require MFA enrollment
+#### Groups that require MFA enrolment
 
 Comma-separated list of group names
 
@@ -308,7 +311,7 @@ Comma-separated list of group names
 
 ---
 
-#### Grace period for MFA enrollment
+#### Grace period for MFA enrolment
 
 Days users have to set up MFA after being added to required group
 
@@ -320,11 +323,11 @@ Days users have to set up MFA after being added to required group
 
 #### TOTP issuer name
 
-Displayed in authenticator apps (e.g., "Example Ltd VPN")
+Displayed in authenticator apps (e.g., "Example Ltd")
 
 **Environment Variable:** `MFA_TOTP_ISSUER`
 
-**Default:** `LDAP`
+**Default:** `Luminary`
 
 ---
 
@@ -348,7 +351,7 @@ Values: none, pending, active, disabled
 
 ---
 
-#### LDAP attribute for enrollment date
+#### LDAP attribute for enrolment date
 
 Used for grace period calculation
 
@@ -378,8 +381,38 @@ Only change if using custom schema
 
 ---
 
+#### LDAP objectClass for groups with MFA policies
 
-## User Profile Settings
+Auxiliary object class for groups. Use this if not using ldap-totp-schema.
+
+**Environment Variable:** `GROUP_MFA_OBJECTCLASS`
+
+**Default:** `mfaGroup`
+
+---
+
+#### LDAP attribute for group MFA requirement flag
+
+Boolean attribute (TRUE/FALSE) indicating if group requires MFA
+
+**Environment Variable:** `GROUP_MFA_REQUIRED_ATTRIBUTE`
+
+**Default:** `mfaRequired`
+
+---
+
+#### LDAP attribute for group MFA grace period
+
+Integer attribute for grace period in days
+
+**Environment Variable:** `GROUP_MFA_GRACE_PERIOD_ATTRIBUTE`
+
+**Default:** `mfaGracePeriodDays`
+
+---
+
+
+## User profile settings
 
 Self-service user profile and editable attributes
 
@@ -418,7 +451,7 @@ Attributes that users must NEVER be allowed to edit
 ---
 
 
-## Email Settings
+## Email settings
 
 SMTP configuration and email notifications
 
@@ -541,13 +574,13 @@ Where account request notifications are sent
 ---
 
 
-## Interface & Branding
+## Interface & branding
 
-Customization, branding, and user interface settings
+Customisation, branding, and user interface settings
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
-| Organization name<br><small>Displayed throughout the interface</small> | string | 📝 `Luminary` | `ORGANISATION_NAME` | Organization name |
+| Organisation name<br><small>Displayed throughout the interface</small> | string | 📝 `Luminary` | `ORGANISATION_NAME` | Organisation name |
 | Site name<br><small>Displayed in page titles and navigation</small> | string | 📝 `Luminary` | `SITE_NAME` | Site name |
 | Server hostname<br><small>Hostname used in URLs</small> | string | 📝 `luminary.id` | `SERVER_HOSTNAME` | Server hostname |
 | Server path<br><small>Base path for the application (e.g., /luminary/)</small> | string | 📝 `/` | `SERVER_PATH` | Server path |
@@ -555,10 +588,11 @@ Customization, branding, and user interface settings
 | LDAP attribute for login<br><small>Which attribute to use for login authentication</small> | string | 📝 `uid` | `SITE_LOGIN_LDAP_ATTRIBUTE` | LDAP attribute for login |
 | Custom logo path<br><small>Path to custom logo file</small> | string | `FALSE` | `CUSTOM_LOGO` | Custom logo path |
 | Custom CSS path<br><small>Path to custom stylesheet</small> | string | `FALSE` | `CUSTOM_STYLES` | Custom CSS path |
+| Items per page for listing pages<br><small>Number of users/groups to show per page in account_manager lists</small> | integer | 📝 `50` | `PAGINATION_ITEMS_PER_PAGE` | Items per page for listing pages |
 
 ### Details
 
-#### Organization name
+#### Organisation name
 
 Displayed throughout the interface
 
@@ -638,8 +672,18 @@ Path to custom stylesheet
 
 ---
 
+#### Items per page for listing pages
 
-## Session & Security
+Number of users/groups to show per page in account_manager lists
+
+**Environment Variable:** `PAGINATION_ITEMS_PER_PAGE`
+
+**Default:** `50`
+
+---
+
+
+## Session & security
 
 Session management and security settings
 
@@ -682,16 +726,16 @@ Login using HTTP headers (e.g., from reverse proxy)
 ---
 
 
-## Audit Logging 🔧
+## Audit logging 🔧
 
-Audit trail and activity logging configuration (Optional)
+Audit trail and activity logging configuration (optional)
 
 > **Note:** This is an optional feature. Set `AUDIT_ENABLED=TRUE` to enable.
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
 | Enable audit logging<br><small>Log all administrative actions to audit trail</small> | ✅ boolean | `FALSE` | `AUDIT_ENABLED` | Enable audit logging |
-| Audit log file path<br><small>Full path to audit log file</small> | string | 📝 `/var/log/luminary/audit.log` | `AUDIT_LOG_FILE` | Audit log file path |
+| Audit log destination<br><small>Use "stdout" for Docker (default), or full path to file for traditional deployments</small> | string | 📝 `stdout` | `AUDIT_LOG_FILE` | Audit log destination |
 | Audit log retention period<br><small>Number of days to keep audit logs</small> | integer | 📝 `90` | `AUDIT_LOG_RETENTION_DAYS` | Audit log retention period |
 
 ### Details
@@ -706,13 +750,13 @@ Log all administrative actions to audit trail
 
 ---
 
-#### Audit log file path
+#### Audit log destination
 
-Full path to audit log file
+Use "stdout" for Docker (default), or full path to file for traditional deployments
 
 **Environment Variable:** `AUDIT_LOG_FILE`
 
-**Default:** `/var/log/luminary/audit.log`
+**Default:** `stdout`
 
 ---
 
@@ -727,31 +771,31 @@ Number of days to keep audit logs
 ---
 
 
-## Password Policy 🔧
+## Password policy 🔧
 
-Password complexity and expiration policies (Optional)
+Password complexity and expiration policies (optional)
 
 > **Note:** This is an optional feature. Set `PASSWORD_POLICY_ENABLED=TRUE` to enable.
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
-| Enable password policy enforcement<br><small>Server-side validation of password requirements</small> | ✅ boolean | `FALSE` | `PASSWORD_POLICY_ENABLED` | Enable password policy enforcement |
-| Enable OpenLDAP ppolicy overlay integration<br><small>Use ppolicy for self-service password changes (requires STARTTLS/LDAPS)</small> | ✅ boolean | `FALSE` | `PPOLICY_ENABLED` | Enable OpenLDAP ppolicy overlay integration |
+| Enable password policy enforcement<br><small>Server-side validation of password requirements. Complexity checks work without additional setup. History/expiry features require OpenLDAP ppolicy overlay.</small> | ✅ boolean | `FALSE` | `PASSWORD_POLICY_ENABLED` | Enable password policy enforcement |
+| Enable OpenLDAP ppolicy overlay integration<br><small>When enabled, self-service password changes use Password Modify Extended Operation to allow ppolicy overlay to enforce password history and expiry. Requires STARTTLS or LDAPS to be enabled for security. Only applies to self-service password changes, not admin changes.</small> | ✅ boolean | `FALSE` | `PPOLICY_ENABLED` | Enable OpenLDAP ppolicy overlay integration |
 | Minimum password length<br><small>Minimum number of characters required</small> | integer | 📝 `8` | `PASSWORD_MIN_LENGTH` | Minimum password length |
 | Require uppercase letters<br><small>Password must contain at least one uppercase letter</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_UPPERCASE` | Require uppercase letters |
 | Require lowercase letters<br><small>Password must contain at least one lowercase letter</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_LOWERCASE` | Require lowercase letters |
 | Require numbers<br><small>Password must contain at least one number</small> | ✅ boolean | `TRUE` | `PASSWORD_REQUIRE_NUMBERS` | Require numbers |
 | Require special characters<br><small>Password must contain at least one special character</small> | ✅ boolean | `FALSE` | `PASSWORD_REQUIRE_SPECIAL` | Require special characters |
 | Minimum password strength score<br><small>Minimum score from 0-4 (from existing strength checker)</small> | integer | 📝 `3` | `PASSWORD_MIN_SCORE` | Minimum password strength score |
-| Password history count<br><small>Number of previous passwords to check (0=disabled)</small> | integer | 📝 `0` | `PASSWORD_HISTORY_COUNT` | Password history count |
-| Password expiry days<br><small>Days until password expires (0=never)</small> | integer | 📝 `0` | `PASSWORD_EXPIRY_DAYS` | Password expiry days |
+| Password history count<br><small>Number of previous passwords to check (0=disabled). REQUIRES: OpenLDAP ppolicy overlay</small> | integer | 📝 `0` | `PASSWORD_HISTORY_COUNT` | Password history count |
+| Password expiry days<br><small>Days until password expires (0=never). REQUIRES: OpenLDAP ppolicy overlay</small> | integer | 📝 `0` | `PASSWORD_EXPIRY_DAYS` | Password expiry days |
 | Password expiry warning period<br><small>Days before expiry to show warning</small> | integer | 📝 `7` | `PASSWORD_EXPIRY_WARNING_DAYS` | Password expiry warning period |
 
 ### Details
 
 #### Enable password policy enforcement
 
-Server-side validation of password requirements
+Server-side validation of password requirements. Complexity checks work without additional setup. History/expiry features require OpenLDAP ppolicy overlay.
 
 **Environment Variable:** `PASSWORD_POLICY_ENABLED`
 
@@ -766,8 +810,6 @@ When enabled, self-service password changes use Password Modify Extended Operati
 **Environment Variable:** `PPOLICY_ENABLED`
 
 **Default:** `FALSE`
-
-**Security Note:** This feature requires a secure LDAP connection (STARTTLS or LDAPS) because the user's cleartext password must be sent to OpenLDAP for ppolicy enforcement. If TLS is not available, password changes will fail with a system configuration error.
 
 ---
 
@@ -833,7 +875,7 @@ Minimum score from 0-4 (from existing strength checker)
 
 #### Password history count
 
-Number of previous passwords to check (0=disabled)
+Number of previous passwords to check (0=disabled). REQUIRES: OpenLDAP ppolicy overlay
 
 **Environment Variable:** `PASSWORD_HISTORY_COUNT`
 
@@ -843,7 +885,7 @@ Number of previous passwords to check (0=disabled)
 
 #### Password expiry days
 
-Days until password expires (0=never)
+Days until password expires (0=never). REQUIRES: OpenLDAP ppolicy overlay
 
 **Environment Variable:** `PASSWORD_EXPIRY_DAYS`
 
@@ -862,9 +904,9 @@ Days before expiry to show warning
 ---
 
 
-## Account Lifecycle 🔧
+## Account lifecycle 🔧
 
-Account expiration and automated management (Optional)
+Account expiration and automated management (optional)
 
 > **Note:** This is an optional feature. Set `LIFECYCLE_ENABLED=TRUE` to enable.
 
@@ -929,9 +971,9 @@ Automatically delete expired accounts (use with caution)
 ---
 
 
-## Advanced Group Management 🔧
+## Advanced group management 🔧
 
-Enhanced group management features (Optional)
+Enhanced group management features (optional)
 
 > **Note:** This is an optional feature. Set `GROUP_BULK_OPERATIONS_ENABLED=TRUE` to enable.
 
@@ -974,7 +1016,7 @@ Groups can contain other groups (requires RFC2307bis)
 ---
 
 
-## Debug & Logging
+## Debug & logging
 
 Debug modes and verbose logging
 
@@ -1089,4 +1131,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2025-11-10 11:20:37 UTC*
+*Last updated: 2025-11-22 12:19:24 UTC*

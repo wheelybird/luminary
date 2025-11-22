@@ -295,10 +295,6 @@ function render_header($title="",$menu=TRUE) {
       }
     }, 10000);
   </script>
-  <div class="alert alert-success alert-dismissible fade show">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    <p class="text-center">You've logged in successfully.</p>
-  </div>
   <?php
 
  }
@@ -660,7 +656,7 @@ function remove_accents($str) {
   );
   $str = strtr($str, $replacements);
 
-  // Normalize to NFD (decomposed form) and remove combining diacritical marks
+  // Normalise to NFD (decomposed form) and remove combining diacritical marks
   if (class_exists('Normalizer', false)) {
     $str = Normalizer::normalize($str, Normalizer::FORM_D);
     // Remove combining diacritical marks (U+0300 to U+036F)
@@ -710,7 +706,7 @@ function generate_username($fn,$ln) {
 
   // ALWAYS remove accents/diacritics for POSIX/LDAP compatibility
   // Required for: homeDirectory (RFC 2307 uses IA5String), email addresses, filesystem paths
-  // This matches the JavaScript behavior: .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  // This matches the JavaScript behaviour: .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   $fn_clean = remove_accents($fn_clean);
   $ln_clean = remove_accents($ln_clean);
 
@@ -974,7 +970,7 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
 
      <div class="row mb-3" id="<?php print $attribute; ?>_div">
 
-       <label for="<?php print $attribute; ?>" class="col-sm-3 col-form-label"><?php print $label; ?></label>
+       <label for="<?php print $attribute; ?>" class="col-sm-3 col-form-label text-end"><?php print $label; ?></label>
        <div class="col-sm-6" id="<?php print $attribute; ?>_input_div">
        <?php if($inputtype == "multipleinput") {
              ?><div class="input-group">
@@ -1093,6 +1089,73 @@ function render_alert_banner($message,$alert_class="success",$timeout=4000) {
      <p class="text-center"><?php print $message; ?></p>
     </div>
 <?php
+}
+
+/**
+ * ============================================================================
+ * TAB RENDERING FUNCTIONS
+ * ============================================================================
+ * Helper functions to render tabbed interfaces based on configuration arrays
+ */
+
+/**
+ * Render tab navigation buttons
+ * @param array $tabs Tab configuration array
+ * @param string $tabs_id ID for the tab navigation ul element
+ */
+function render_tab_navigation($tabs, $tabs_id = 'userTabs') {
+  echo '<ul class="nav nav-tabs" id="' . htmlspecialchars($tabs_id) . '" role="tablist">' . "\n";
+
+  foreach ($tabs as $tab) {
+    $active_class = $tab['active'] ? ' active' : '';
+    $aria_selected = $tab['active'] ? 'true' : 'false';
+
+    echo '  <li class="nav-item" role="presentation">' . "\n";
+    echo '    <button class="nav-link' . $active_class . '" ';
+    echo 'id="' . $tab['id'] . '-tab" ';
+    echo 'data-bs-toggle="tab" ';
+    echo 'data-bs-target="#' . $tab['id'] . '" ';
+    echo 'type="button" role="tab" ';
+    echo 'aria-controls="' . $tab['id'] . '" ';
+    echo 'aria-selected="' . $aria_selected . '">' . "\n";
+    echo '      <i class="' . $tab['icon'] . '"></i> ' . htmlspecialchars($tab['label']) . "\n";
+    echo '    </button>' . "\n";
+    echo '  </li>' . "\n";
+  }
+
+  echo '</ul>' . "\n";
+}
+
+/**
+ * Render tab state persistence JavaScript
+ * @param string $storage_key LocalStorage key name
+ * @param string $tabs_selector CSS selector for tab buttons
+ */
+function render_tab_persistence_js($storage_key, $tabs_selector) {
+  ?>
+<script>
+// Tab state persistence
+document.addEventListener('DOMContentLoaded', function() {
+  // Restore last active tab from localStorage
+  const lastTab = localStorage.getItem('<?php echo $storage_key; ?>');
+  if (lastTab) {
+    const tabButton = document.querySelector(`button[data-bs-target="${lastTab}"]`);
+    if (tabButton) {
+      const tab = new bootstrap.Tab(tabButton);
+      tab.show();
+    }
+  }
+
+  // Save active tab to localStorage when changed
+  const tabButtons = document.querySelectorAll('<?php echo $tabs_selector; ?> button[data-bs-toggle="tab"]');
+  tabButtons.forEach(button => {
+    button.addEventListener('shown.bs.tab', function(e) {
+      localStorage.setItem('<?php echo $storage_key; ?>', e.target.dataset.bsTarget);
+    });
+  });
+});
+</script>
+  <?php
 }
 
 

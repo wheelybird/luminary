@@ -101,7 +101,7 @@ function display_config_item($key, $metadata) {
 
 <div class="container-fluid">
 
-  <h2>System Configuration</h2>
+  <h2>System configuration</h2>
   <p class="text-muted">
     Current configuration values.
     <span class="badge bg-primary">Blue badges</span> indicate values changed from defaults.
@@ -259,7 +259,7 @@ function display_config_item($key, $metadata) {
   </div> <!-- End configCategories -->
 
   <div class="alert alert-info">
-    <h5><i class="bi bi-info-circle"></i> About This Page</h5>
+    <h5><i class="bi bi-info-circle"></i> About this page</h5>
     <p class="mb-0">
       This page is automatically generated from the configuration registry.
       All configuration options are defined in <code>config.inc.php</code>.
@@ -268,7 +268,7 @@ function display_config_item($key, $metadata) {
   </div>
 
   <!-- System Information Section -->
-  <h2 class="mt-5"><i class="bi bi-info-square"></i> System Information</h2>
+  <h2 class="mt-5"><i class="bi bi-info-square"></i> System information</h2>
   <p class="text-muted">Runtime environment and server details</p>
 
   <?php
@@ -318,6 +318,23 @@ function display_config_item($key, $metadata) {
     $ldap_status_class = 'bg-danger';
   }
 
+  // Determine TLS/SSL status from actual connection
+  $tls_status = 'None (Unencrypted)';
+  $tls_status_class = 'bg-warning text-dark';
+  $tls_icon = 'bi-shield-x';
+
+  if (isset($LDAP['connection_type'])) {
+    if ($LDAP['connection_type'] == 'LDAPS') {
+      $tls_status = 'LDAPS (SSL/TLS)';
+      $tls_status_class = 'bg-success';
+      $tls_icon = 'bi-shield-lock';
+    } elseif ($LDAP['connection_type'] == 'StartTLS') {
+      $tls_status = 'StartTLS';
+      $tls_status_class = 'bg-success';
+      $tls_icon = 'bi-shield-lock';
+    }
+  }
+
   // Get loaded PHP extensions
   $important_extensions = array(
     'ldap' => 'LDAP',
@@ -352,7 +369,7 @@ function display_config_item($key, $metadata) {
     <div class="col-md-6 mb-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title mb-0"><i class="bi bi-code-square"></i> PHP Runtime</h5>
+          <h5 class="card-title mb-0"><i class="bi bi-code-square"></i> PHP runtime</h5>
         </div>
         <div class="card-body">
           <table class="table table-sm mb-0">
@@ -427,7 +444,7 @@ function display_config_item($key, $metadata) {
     <div class="col-md-6 mb-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title mb-0"><i class="bi bi-diagram-3"></i> LDAP Connection</h5>
+          <h5 class="card-title mb-0"><i class="bi bi-diagram-3"></i> LDAP connection</h5>
         </div>
         <div class="card-body">
           <table class="table table-sm mb-0">
@@ -447,6 +464,10 @@ function display_config_item($key, $metadata) {
               <th>Connection Status</th>
               <td><span class="badge <?php echo $ldap_status_class; ?>"><?php echo htmlspecialchars($ldap_status); ?></span></td>
             </tr>
+            <tr>
+              <th>TLS/SSL Encryption</th>
+              <td><i class="<?php echo $tls_icon; ?>"></i> <span class="badge <?php echo $tls_status_class; ?>"><?php echo htmlspecialchars($tls_status); ?></span></td>
+            </tr>
           </table>
         </div>
       </div>
@@ -456,7 +477,7 @@ function display_config_item($key, $metadata) {
     <div class="col-md-12 mb-3">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title mb-0"><i class="bi bi-puzzle"></i> PHP Extensions</h5>
+          <h5 class="card-title mb-0"><i class="bi bi-puzzle"></i> PHP extensions</h5>
         </div>
         <div class="card-body">
           <div class="row">

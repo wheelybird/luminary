@@ -467,14 +467,14 @@ To re-enable, set `MFA_FEATURE_ENABLED=TRUE` and existing enrolments will work i
 
 Luminary enforces MFA at login based on group membership. Users in MFA-required groups must enter their TOTP code after password validation.
 
-**Behavior:**
+**Behaviour:**
 
 - **Users in MFA-required groups with active MFA:**
   - Enter password → Enter TOTP code → Access granted
 
 - **Users in MFA-required groups without MFA (within grace period):**
   - Enter password → Redirected to MFA setup page
-  - Can only access MFA enrollment until setup is complete
+  - Can only access MFA enrolment until setup is complete
 
 - **Users in MFA-required groups with expired grace period:**
   - Cannot log in until MFA is configured
@@ -523,7 +523,7 @@ Luminary enforces MFA at login based on group membership. Users in MFA-required 
 **Services With Configurable Enforcement:**
 
 - **pam-ldap-totp-auth** (PAM module for SSH, VPN, etc.): Planned feature
-  - Current behavior: All-or-nothing (if PAM module is configured, ALL users need MFA)
+  - Current behaviour: All-or-nothing (if PAM module is configured, ALL users need MFA)
   - **Planned**: New `group_based_enforcement` option to check LDAP group membership
   - See PAM module documentation for updates
 
@@ -531,13 +531,13 @@ Luminary enforces MFA at login based on group membership. Users in MFA-required 
 
 The group MFA settings in LDAP (`mfaRequired`, `mfaGracePeriodDays`) serve two purposes:
 
-1. **Enrollment Tracking** (all services): Determines who should set up MFA and manages grace periods
+1. **Enrolment Tracking** (all services): Determines who should set up MFA and manages grace periods
 2. **Access Control** (service-dependent): Some services check group membership before requiring TOTP validation
 
 When deploying MFA:
-- Group settings control enrollment requirements (universal)
+- Group settings control enrolment requirements (universal)
 - Each service decides whether to check group membership or enforce for all users
-- Check service-specific documentation for MFA enforcement behavior
+- Check service-specific documentation for MFA enforcement behaviour
 
 ## Advanced Topics
 

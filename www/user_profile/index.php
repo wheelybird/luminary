@@ -40,7 +40,7 @@ $attribute_config = array(
   'postofficebox' => array('label' => 'P.O. Box', 'inputtype' => 'text'),
   'usercertificate' => array('label' => 'Certificate', 'inputtype' => 'binary'),
   'labeleduri' => array('label' => 'Website', 'inputtype' => 'url'),
-  'carlicense' => array('label' => 'Car License', 'inputtype' => 'text'),
+  'carlicense' => array('label' => 'Car Licence', 'inputtype' => 'text'),
   'roomnumber' => array('label' => 'Room Number', 'inputtype' => 'text'),
   'departmentnumber' => array('label' => 'Department', 'inputtype' => 'text'),
   'initials' => array('label' => 'Initials', 'inputtype' => 'text'),
@@ -238,7 +238,7 @@ if (isset($user[0]['cn'][0])) {
 
 <div class="container">
 
-  <h2>My Profile</h2>
+  <h2>My profile</h2>
   <p class="text-muted">Manage your personal information and contact details</p>
 
   <div class="card">
@@ -324,7 +324,7 @@ if (isset($user[0]['cn'][0])) {
   <div class="card mt-3">
     <div class="card-header">
       <h4 class="card-title">
-        Password Information
+        Password information
         <span class="badge bg-<?php echo $status_class; ?> float-end"><?php echo $status_text; ?></span>
       </h4>
     </div>
@@ -354,7 +354,7 @@ if (isset($user[0]['cn'][0])) {
       <div class="row">
         <div class="col-sm-12">
           <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">
-            <i class="bi bi-key"></i> Change Password
+            <i class="bi bi-key"></i> Change password
           </a>
         </div>
       </div>
@@ -408,7 +408,7 @@ if (isset($user[0]['cn'][0])) {
   <div class="card mt-3">
     <div class="card-header">
       <h4 class="card-title">
-        Account Information
+        Account information
         <span class="badge bg-<?php echo $account_status_class; ?> float-end"><?php echo $account_status_text; ?></span>
       </h4>
     </div>

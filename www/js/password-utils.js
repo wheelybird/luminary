@@ -1,6 +1,6 @@
 /**
- * Password Utilities - Vanilla JavaScript
- * Provides password generation and strength checking without jQuery dependencies
+ * Password utilities
+ * Provides password generation and strength checking
  */
 
 // Word list for passphrase generation
@@ -66,17 +66,57 @@ const WORD_LIST = [
  * @param {string} confirmFieldId - ID of confirm input field
  */
 function generatePassword(wordCount, separator, passwordFieldId, confirmFieldId) {
+  // Get requirements if they exist
+  const requirements = window.passwordRequirements || {
+    minLength: 12,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumbers: true,
+    requireSpecial: false
+  };
+
   const words = [];
   for (let i = 0; i < wordCount; i++) {
     const randomIndex = Math.floor(Math.random() * WORD_LIST.length);
-    // Capitalize first letter of each word
     const word = WORD_LIST[randomIndex];
-    words.push(word.charAt(0).toUpperCase() + word.slice(1));
+
+    // Capitalize first letter if uppercase required, otherwise lowercase
+    if (requirements.requireUppercase) {
+      words.push(word.charAt(0).toUpperCase() + word.slice(1));
+    } else {
+      words.push(word);
+    }
   }
 
-  // Add a random number at the end for extra strength
-  const randomNum = Math.floor(Math.random() * 100);
-  const password = words.join(separator) + randomNum;
+  // Build password ensuring all requirements are met
+  let password = words.join(separator);
+
+  // Add number if required
+  if (requirements.requireNumbers) {
+    const randomNum = Math.floor(Math.random() * 100);
+    password += randomNum;
+  }
+
+  // Add special character if required
+  if (requirements.requireSpecial) {
+    const specialChars = '!@#$%^&*';
+    const randomSpecial = specialChars[Math.floor(Math.random() * specialChars.length)];
+    password += randomSpecial;
+  }
+
+  // Ensure minimum length is met
+  while (password.length < requirements.minLength) {
+    const randomIndex = Math.floor(Math.random() * WORD_LIST.length);
+    const word = WORD_LIST[randomIndex];
+    password += separator + (requirements.requireUppercase ? word.charAt(0).toUpperCase() + word.slice(1) : word);
+  }
+
+  // Ensure lowercase is present if required (words should already have it)
+  // Just verify - if somehow missing, add a word in lowercase
+  if (requirements.requireLowercase && !/[a-z]/.test(password)) {
+    const randomIndex = Math.floor(Math.random() * WORD_LIST.length);
+    password += WORD_LIST[randomIndex];
+  }
 
   // Set the password fields
   const passwordField = document.getElementById(passwordFieldId);
@@ -91,8 +131,14 @@ function generatePassword(wordCount, separator, passwordFieldId, confirmFieldId)
     confirmField.type = 'text'; // Show password briefly
   }
 
-  // Update strength meter
+  // Update strength meter or requirements (try both, one will exist)
   updatePasswordStrength(password);
+
+  // Also try to update requirements if they exist
+  const requirementsContainer = document.getElementById('PasswordRequirements');
+  if (requirementsContainer && typeof window.passwordRequirements !== 'undefined') {
+    updatePasswordRequirements(password, window.passwordRequirements);
+  }
 
   return password;
 }
@@ -138,7 +184,99 @@ function calculatePasswordStrength(password) {
 }
 
 /**
- * Update the password strength progress bar
+ * Update password requirements checklist
+ * @param {string} password - Password to check
+ * @param {Object} requirements - Password policy requirements
+ */
+function updatePasswordRequirements(password, requirements) {
+  const checklistContainer = document.getElementById('PasswordRequirements');
+  const passScoreField = document.getElementById('pass_score');
+
+  if (!checklistContainer || !requirements) return;
+
+  // If password is empty, show requirements but don't mark any as met
+  const checks = [];
+  let metCount = 0;
+  let totalCount = 0;
+
+  // Check minimum length
+  if (requirements.minLength > 0) {
+    totalCount++;
+    const met = password.length >= requirements.minLength;
+    if (met) metCount++;
+    checks.push({
+      label: `At least ${requirements.minLength} characters`,
+      met: met
+    });
+  }
+
+  // Check uppercase requirement
+  if (requirements.requireUppercase) {
+    totalCount++;
+    const met = /[A-Z]/.test(password);
+    if (met) metCount++;
+    checks.push({
+      label: 'At least one uppercase letter (A-Z)',
+      met: met
+    });
+  }
+
+  // Check lowercase requirement
+  if (requirements.requireLowercase) {
+    totalCount++;
+    const met = /[a-z]/.test(password);
+    if (met) metCount++;
+    checks.push({
+      label: 'At least one lowercase letter (a-z)',
+      met: met
+    });
+  }
+
+  // Check numbers requirement
+  if (requirements.requireNumbers) {
+    totalCount++;
+    const met = /[0-9]/.test(password);
+    if (met) metCount++;
+    checks.push({
+      label: 'At least one number (0-9)',
+      met: met
+    });
+  }
+
+  // Check special characters requirement
+  if (requirements.requireSpecial) {
+    totalCount++;
+    const met = /[^a-zA-Z0-9]/.test(password);
+    if (met) metCount++;
+    checks.push({
+      label: 'At least one special character (!@#$%^&*)',
+      met: met
+    });
+  }
+
+  // Build checklist HTML
+  let html = '<ul class="list-unstyled mb-0" style="text-align: left;">';
+
+  checks.forEach(check => {
+    const icon = check.met
+      ? '<i class="bi bi-check-circle-fill text-success"></i>'
+      : '<i class="bi bi-circle text-muted"></i>';
+    const textClass = check.met ? 'text-success' : 'text-muted';
+    html += `<li class="${textClass}"><small>${icon} ${check.label}</small></li>`;
+  });
+
+  html += '</ul>';
+  checklistContainer.innerHTML = html;
+
+  // Calculate score for hidden field (0-4 based on percentage of requirements met)
+  const score = totalCount > 0 ? Math.round((metCount / totalCount) * 4) : 0;
+  if (passScoreField) {
+    passScoreField.value = score;
+  }
+}
+
+/**
+ * Update the password strength progress bar (legacy function for backward compatibility)
  * @param {string} password - Password to check
  */
 function updatePasswordStrength(password) {
@@ -193,12 +331,32 @@ function initPasswordStrength(passwordInputId) {
   updatePasswordStrength(passwordInput.value);
 }
 
+/**
+ * Initialize password requirements checker on an input field
+ * @param {string} passwordInputId - ID of password input field
+ * @param {Object} requirements - Password policy requirements object
+ */
+function initPasswordRequirements(passwordInputId, requirements) {
+  const passwordInput = document.getElementById(passwordInputId);
+  if (!passwordInput || !requirements) return;
+
+  // Update on input
+  passwordInput.addEventListener('input', function() {
+    updatePasswordRequirements(this.value, requirements);
+  });
+
+  // Initial check (empty password shows all requirements as unmet)
+  updatePasswordRequirements(passwordInput.value, requirements);
+}
+
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     generatePassword,
     calculatePasswordStrength,
     updatePasswordStrength,
-    initPasswordStrength
+    updatePasswordRequirements,
+    initPasswordStrength,
+    initPasswordRequirements
   };
 }

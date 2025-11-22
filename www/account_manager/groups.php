@@ -14,6 +14,14 @@ render_submenu();
 
 $ldap_connection = open_ldap_connection();
 
+// Get pagination parameters
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$per_page = $PAGINATION_ITEMS_PER_PAGE;
+$offset = ($page - 1) * $per_page;
+
+// Get search filter
+$filter = isset($_GET['filter']) ? trim($_GET['filter']) : '';
+
 if (isset($_POST['delete_group'])) {
 
  $this_group = $_POST['delete_group'];
@@ -34,9 +42,33 @@ if (isset($_POST['delete_group'])) {
 
 }
 
-$groups = ldap_get_group_list($ldap_connection);
+// Get all groups
+$all_groups = ldap_get_group_list($ldap_connection);
 
-// Fetch group details (description, MFA status)
+// Apply search filter if provided (fetch details only for matching groups)
+$filtered_groups = $all_groups;
+if (!empty($filter)) {
+  $filtered_groups = array();
+  foreach ($all_groups as $group_cn) {
+    $group_entry = ldap_get_group_entry($ldap_connection, $group_cn);
+    if ($group_entry) {
+      $description = isset($group_entry[0]['description'][0]) ? $group_entry[0]['description'][0] : '';
+      $search_string = strtolower($group_cn . ' ' . $description);
+      if (strpos($search_string, strtolower($filter)) !== false) {
+        $filtered_groups[] = $group_cn;
+      }
+    }
+  }
+}
+
+// Calculate pagination
+$total_groups = count($filtered_groups);
+$total_pages = ceil($total_groups / $per_page);
+
+// Get paginated subset
+$groups = array_slice($filtered_groups, $offset, $per_page);
+
+// Fetch group details (description, MFA status) for paginated groups only
 $group_details = array();
 foreach ($groups as $group_cn) {
   $group_entry = ldap_get_group_entry($ldap_connection, $group_cn);
@@ -83,15 +115,33 @@ render_js_username_check();
 
 </script>
 <div class="container">
-
- <div class="form-inline" id="new_group_div">
-  <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/show_group.php" method="post">
-   <input type="hidden" name="new_group">
-   <button type="button" class="btn btn-light"><?php print count($groups);?> group<?php if (count($groups) != 1) { print "s"; }?></button>  &nbsp;  <button id="show_new_group" class="form-control btn btn-secondary" type="button" onclick="show_new_group_form();">New group</button>
-   <input type="text" class="form-control invisible" name="group_name" id="group_name" placeholder="Group name" onkeyup="check_entity_name_validity(document.getElementById('group_name').value,'new_group_div');"><button id="add_group" class="form-control btn btn-primary btn-sm invisible" type="submit">Add</button>
-  </form>
+ <div class="row mb-3">
+   <div class="col-md-6">
+     <form action="<?php print "{$THIS_MODULE_PATH}"; ?>/show_group.php" method="post" class="d-inline">
+       <input type="hidden" name="new_group">
+       <button type="button" class="btn btn-light"><?php print number_format($total_groups);?> group<?php if ($total_groups != 1) { print "s"; }?></button>
+       <button id="show_new_group" class="btn btn-secondary" type="button" onclick="show_new_group_form();">New group</button>
+       <input type="text" class="invisible" name="group_name" id="group_name" placeholder="Group name" onkeyup="check_entity_name_validity(document.getElementById('group_name').value,'new_group_div');">
+       <button id="add_group" class="btn btn-primary invisible" type="submit">Add</button>
+     </form>
+   </div>
+   <div class="col-md-6">
+     <form action="" method="get" class="d-flex">
+       <input class="form-control me-2" id="search_input" name="filter" type="text" placeholder="Search groups..." value="<?php echo htmlspecialchars($filter); ?>">
+       <button type="submit" class="btn btn-primary">Search</button>
+       <?php if (!empty($filter)) { ?>
+         <a href="?" class="btn btn-secondary ms-2">Clear</a>
+       <?php } ?>
+     </form>
+   </div>
  </div>
- <input class="form-control" id="search_input" type="text" placeholder="Search..">
+
+ <?php if (!empty($filter)) { ?>
+   <div class="alert alert-info">
+     Showing <?php echo count($groups); ?> of <?php echo number_format($total_groups); ?> groups matching "<?php echo htmlspecialchars($filter); ?>"
+   </div>
+ <?php } ?>
+
  <table class="table table-striped">
   <thead>
    <tr>
@@ -103,19 +153,6 @@ render_js_username_check();
    </tr>
   </thead>
  <tbody id="grouplist">
-   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const searchInput = document.getElementById('search_input');
-      searchInput.addEventListener('keyup', function() {
-        const value = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#grouplist tr');
-        rows.forEach(function(row) {
-          const text = row.textContent.toLowerCase();
-          row.style.display = text.indexOf(value) > -1 ? '' : 'none';
-        });
-      });
-    });
-  </script>
 <?php
 foreach ($groups as $group) {
   $details = isset($group_details[$group]) ? $group_details[$group] : array('description' => '', 'mfa_required' => false);
@@ -139,9 +176,67 @@ foreach ($groups as $group) {
 
   print " </tr>\n";
 }
+
+if (count($groups) == 0) {
+  $colspan = $MFA_FEATURE_ENABLED == TRUE ? '3' : '2';
+  print " <tr><td colspan='$colspan' class='text-center text-muted'>No groups found</td></tr>\n";
+}
 ?>
   </tbody>
  </table>
+
+ <!-- Pagination -->
+ <?php if ($total_pages > 1) { ?>
+   <nav aria-label="Group list pagination" class="mt-3">
+     <ul class="pagination justify-content-center">
+       <!-- Previous -->
+       <li class="page-item <?php if ($page <= 1) echo 'disabled'; ?>">
+         <a class="page-link" href="?page=<?php echo $page - 1; ?><?php if (!empty($filter)) echo '&filter=' . urlencode($filter); ?>">Previous</a>
+       </li>
+
+       <!-- Page numbers -->
+       <?php
+       $start_page = max(1, $page - 5);
+       $end_page = min($total_pages, $page + 5);
+
+       if ($start_page > 1) {
+         echo '<li class="page-item"><a class="page-link" href="?page=1';
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">1</a></li>';
+         if ($start_page > 2) {
+           echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+         }
+       }
+
+       for ($i = $start_page; $i <= $end_page; $i++) {
+         $active = ($i == $page) ? 'active' : '';
+         echo '<li class="page-item ' . $active . '"><a class="page-link" href="?page=' . $i;
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">' . $i . '</a></li>';
+       }
+
+       if ($end_page < $total_pages) {
+         if ($end_page < $total_pages - 1) {
+           echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
+         }
+         echo '<li class="page-item"><a class="page-link" href="?page=' . $total_pages;
+         if (!empty($filter)) echo '&filter=' . urlencode($filter);
+         echo '">' . $total_pages . '</a></li>';
+       }
+       ?>
+
+       <!-- Next -->
+       <li class="page-item <?php if ($page >= $total_pages) echo 'disabled'; ?>">
+         <a class="page-link" href="?page=<?php echo $page + 1; ?><?php if (!empty($filter)) echo '&filter=' . urlencode($filter); ?>">Next</a>
+       </li>
+     </ul>
+   </nav>
+
+   <p class="text-center text-muted">
+     Page <?php echo $page; ?> of <?php echo number_format($total_pages); ?>
+     (Showing <?php echo (($page - 1) * $per_page) + 1; ?>-<?php echo min($page * $per_page, $total_groups); ?> of <?php echo number_format($total_groups); ?>)
+   </p>
+ <?php } ?>
 </div>
 <?php
 

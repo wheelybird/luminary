@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Configuration Registry
+ * Configuration registry
  *
- * Centralized configuration metadata for auto-generating:
+ * Centralised configuration metadata for auto-generating:
  * - System Configuration page
  * - Documentation
  * - Validation
@@ -19,81 +19,80 @@
  * - display_code: Whether to display in <code> tags
  */
 
-# Category Definitions
-# Categories group related configurations together
+# Category definitions - groups related configurations together
 $CONFIG_CATEGORIES = array(
   'ldap' => array(
-    'name' => 'LDAP Directory Settings',
+    'name' => 'LDAP settings',
     'description' => 'Connection settings and directory structure configuration',
     'order' => 1,
     'icon' => 'bi-diagram-3'
   ),
   'user_defaults' => array(
-    'name' => 'User Account Defaults',
-    'description' => 'Default values and behavior for new user accounts',
+    'name' => 'User account defaults',
+    'description' => 'Default values and behaviour for new user accounts',
     'order' => 2,
     'icon' => 'bi-person-gear'
   ),
   'mfa' => array(
-    'name' => 'Multi-Factor Authentication',
+    'name' => 'Multi-factor authentication',
     'description' => 'TOTP/MFA configuration and enforcement policies',
     'order' => 3,
     'icon' => 'bi-shield-lock'
   ),
   'user_profile' => array(
-    'name' => 'User Profile Settings',
+    'name' => 'User profile settings',
     'description' => 'Self-service user profile and editable attributes',
     'order' => 4,
     'icon' => 'bi-person-badge'
   ),
   'email' => array(
-    'name' => 'Email Settings',
+    'name' => 'Email settings',
     'description' => 'SMTP configuration and email notifications',
     'order' => 5,
     'icon' => 'bi-envelope'
   ),
   'interface' => array(
-    'name' => 'Interface & Branding',
-    'description' => 'Customization, branding, and user interface settings',
+    'name' => 'Interface & branding',
+    'description' => 'Customisation, branding, and user interface settings',
     'order' => 6,
     'icon' => 'bi-palette'
   ),
   'security' => array(
-    'name' => 'Session & Security',
+    'name' => 'Session & security',
     'description' => 'Session management and security settings',
     'order' => 7,
     'icon' => 'bi-shield-check'
   ),
   'audit' => array(
-    'name' => 'Audit Logging',
-    'description' => 'Audit trail and activity logging configuration (Optional)',
+    'name' => 'Audit logging',
+    'description' => 'Audit trail and activity logging configuration (optional)',
     'order' => 8,
     'icon' => 'bi-journal-text',
     'optional' => true
   ),
   'password_policy' => array(
-    'name' => 'Password Policy',
-    'description' => 'Password complexity and expiration policies (Optional)',
+    'name' => 'Password policy',
+    'description' => 'Password complexity and expiration policies (optional)',
     'order' => 9,
     'icon' => 'bi-key',
     'optional' => true
   ),
   'lifecycle' => array(
-    'name' => 'Account Lifecycle',
-    'description' => 'Account expiration and automated management (Optional)',
+    'name' => 'Account lifecycle',
+    'description' => 'Account expiration and automated management (optional)',
     'order' => 10,
     'icon' => 'bi-arrow-repeat',
     'optional' => true
   ),
   'group_mgmt' => array(
-    'name' => 'Advanced Group Management',
-    'description' => 'Enhanced group management features (Optional)',
+    'name' => 'Advanced group management',
+    'description' => 'Enhanced group management features (optional)',
     'order' => 11,
     'icon' => 'bi-people',
     'optional' => true
   ),
   'debug' => array(
-    'name' => 'Debug & Logging',
+    'name' => 'Debug & logging',
     'description' => 'Debug modes and verbose logging',
     'order' => 99,
     'icon' => 'bi-bug'
@@ -158,7 +157,7 @@ $CONFIG_REGISTRY = array(
 
   'LDAP_USER_OU' => array(
     'category' => 'ldap',
-    'description' => 'Organizational unit for user accounts',
+    'description' => 'Organisational unit for user accounts',
     'help' => 'OU name only (without base DN)',
     'type' => 'string',
     'default' => 'people',
@@ -169,7 +168,7 @@ $CONFIG_REGISTRY = array(
 
   'LDAP_GROUP_OU' => array(
     'category' => 'ldap',
-    'description' => 'Organizational unit for groups',
+    'description' => 'Organisational unit for groups',
     'help' => 'OU name only (without base DN)',
     'type' => 'string',
     'default' => 'groups',
@@ -366,7 +365,7 @@ $CONFIG_REGISTRY = array(
 
   'MFA_REQUIRED_GROUPS' => array(
     'category' => 'mfa',
-    'description' => 'Groups that require MFA enrollment',
+    'description' => 'Groups that require MFA enrolment',
     'help' => 'Comma-separated list of group names',
     'type' => 'array',
     'default' => array(),
@@ -377,7 +376,7 @@ $CONFIG_REGISTRY = array(
 
   'MFA_GRACE_PERIOD_DAYS' => array(
     'category' => 'mfa',
-    'description' => 'Grace period for MFA enrollment',
+    'description' => 'Grace period for MFA enrolment',
     'help' => 'Days users have to set up MFA after being added to required group',
     'type' => 'integer',
     'default' => 7,
@@ -389,9 +388,9 @@ $CONFIG_REGISTRY = array(
   'MFA_TOTP_ISSUER' => array(
     'category' => 'mfa',
     'description' => 'TOTP issuer name',
-    'help' => 'Displayed in authenticator apps (e.g., "Example Ltd VPN")',
+    'help' => 'Displayed in authenticator apps (e.g., "Example Ltd")',
     'type' => 'string',
-    'default' => 'LDAP',
+    'default' => 'Luminary',
     'mandatory' => false,
     'env_var' => 'MFA_TOTP_ISSUER',
     'variable' => '$MFA_TOTP_ISSUER'
@@ -423,7 +422,7 @@ $CONFIG_REGISTRY = array(
 
   'TOTP_ENROLLED_DATE_ATTRIBUTE' => array(
     'category' => 'mfa',
-    'description' => 'LDAP attribute for enrollment date',
+    'description' => 'LDAP attribute for enrolment date',
     'help' => 'Used for grace period calculation',
     'type' => 'string',
     'default' => 'totpEnrolledDate',
@@ -677,7 +676,7 @@ $CONFIG_REGISTRY = array(
 
   'ORGANISATION_NAME' => array(
     'category' => 'interface',
-    'description' => 'Organization name',
+    'description' => 'Organisation name',
     'help' => 'Displayed throughout the interface',
     'type' => 'string',
     'default' => 'Luminary',
@@ -762,6 +761,17 @@ $CONFIG_REGISTRY = array(
     'mandatory' => false,
     'env_var' => 'CUSTOM_STYLES',
     'variable' => '$CUSTOM_STYLES'
+  ),
+
+  'PAGINATION_ITEMS_PER_PAGE' => array(
+    'category' => 'interface',
+    'description' => 'Items per page for listing pages',
+    'help' => 'Number of users/groups to show per page in account_manager lists',
+    'type' => 'integer',
+    'default' => 50,
+    'mandatory' => false,
+    'env_var' => 'PAGINATION_ITEMS_PER_PAGE',
+    'variable' => '$PAGINATION_ITEMS_PER_PAGE'
   ),
 
   // ===== Session & Security =====
@@ -1099,7 +1109,7 @@ $CONFIG_REGISTRY = array(
 );
 
 ##############################################################################
-# VARIABLE INITIALIZATION
+# VARIABLE INITIALISATION
 # Set actual PHP variables from environment, using registry defaults
 ##############################################################################
 
@@ -1356,6 +1366,7 @@ $SITE_LOGIN_FIELD_LABEL = (getenv('SITE_LOGIN_FIELD_LABEL') ? getenv('SITE_LOGIN
 
 $CUSTOM_LOGO = (getenv('CUSTOM_LOGO') ? getenv('CUSTOM_LOGO') : FALSE);
 $CUSTOM_STYLES = (getenv('CUSTOM_STYLES') ? getenv('CUSTOM_STYLES') : FALSE);
+$PAGINATION_ITEMS_PER_PAGE = (is_numeric(getenv('PAGINATION_ITEMS_PER_PAGE')) ? (int)getenv('PAGINATION_ITEMS_PER_PAGE') : get_config_default('PAGINATION_ITEMS_PER_PAGE'));
 
 ##############################################################################
 # Session & Security

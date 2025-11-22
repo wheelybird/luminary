@@ -225,7 +225,13 @@ if (isset($_POST["user_id"]) and isset($_POST["password"])) {
      header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}manage_mfa?mfa_required\n\n");
     }
     elseif (isset($_POST["redirect_to"])) {
-     header("Location: //{$_SERVER['HTTP_HOST']}" . base64_decode($_POST['redirect_to']) . "\n\n");
+     $redirect_url = base64_decode($_POST['redirect_to']);
+     // If admin is being redirected to home page, send them to account_manager instead
+     if ($is_admin && (strpos($redirect_url, '/home') !== false || strpos($redirect_url, 'home/') !== false)) {
+      header("Location: //{$_SERVER['HTTP_HOST']}{$SERVER_PATH}account_manager?logged_in\n\n");
+     } else {
+      header("Location: //{$_SERVER['HTTP_HOST']}" . $redirect_url . "\n\n");
+     }
     }
     else {
      $default_module = $is_admin ? "account_manager" : "home";
@@ -249,7 +255,7 @@ else {
  ?>
 <div class="container">
  <div class="row justify-content-center">
-  <div class="col-sm-8">
+  <div class="col-md-8">
 
    <div class="card">
    <div class="card-header text-center">Log in</div>
@@ -277,20 +283,20 @@ else {
     <?php if (isset($redirect_to) and ($redirect_to != "")) { ?><input type="hidden" name="redirect_to" value="<?php print htmlspecialchars($redirect_to); ?>"><?php } ?>
 
     <div class="row mb-3">
-     <label for="username" class="col-sm-4 col-form-label"><?php print $SITE_LOGIN_FIELD_LABEL; ?></label>
+     <label for="username" class="col-sm-4 col-form-label text-end"><?php print $SITE_LOGIN_FIELD_LABEL; ?></label>
      <div class="col-sm-6">
       <input type="text" class="form-control" id="user_id" name="user_id">
      </div>
     </div>
 
     <div class="row mb-3">
-     <label for="password" class="col-sm-4 col-form-label">Password</label>
+     <label for="password" class="col-sm-4 col-form-label text-end">Password</label>
      <div class="col-sm-6">
       <input type="password" class="form-control" id="confirm" name="password">
      </div>
     </div>
 
-    <div class="row mb-3">
+    <div class="text-center mb-3">
      <button type="submit" class="btn btn-secondary">Log in</button>
     </div>
 

@@ -98,17 +98,17 @@ if (isset($_POST['change_password'])) {
   ?>
   <div class="container">
     <div class="row justify-content-center">
-      <div class="col-sm-6">
+      <div class="col-md-8">
         <div class="card border-success">
-        <div class="card-header">Success</div>
-        <div class="card-body">
-          Your password has been updated.
+          <div class="card-header text-center">Success</div>
+          <div class="card-body">
+            Your password has been updated
+          </div>
         </div>
-      </div>
       </div>
     </div>
   </div>
-  <?php
+<?php
   render_footer();
   exit(0);
   }
@@ -199,16 +199,10 @@ if ($password_age_days !== null) { ?>
 ?>
 
 <script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
-<script>
- // Initialize password strength meter
- document.addEventListener('DOMContentLoaded', function() {
-   initPasswordStrength('password');
- });
-</script>
 
 <div class="container">
  <div class="row justify-content-center">
-  <div class="col-sm-6">
+  <div class="col-md-8">
 
    <div class="card">
    <div class="card-header text-center">Change your password</div>
@@ -227,7 +221,7 @@ if ($password_age_days !== null) { ?>
 
      <?php if ($PPOLICY_ENABLED) { ?>
      <div class="row mb-3">
-      <label for="current_password" class="col-sm-4 col-form-label">Current Password</label>
+      <label for="current_password" class="col-sm-3 col-form-label text-end">Current Password</label>
       <div class="col-sm-6">
        <input type="password" class="form-control" id="current_password" name="current_password" autocomplete="current-password" required>
       </div>
@@ -235,7 +229,7 @@ if ($password_age_days !== null) { ?>
      <?php } ?>
 
      <div class="row mb-3" id="password_div">
-      <label for="password" class="col-sm-4 col-form-label">New Password</label>
+      <label for="password" class="col-sm-3 col-form-label text-end">New Password</label>
       <div class="col-sm-6">
        <input type="password" class="form-control" id="password" name="password" autocomplete="new-password">
       </div>
@@ -258,21 +252,51 @@ if ($password_age_days !== null) { ?>
      </script>
 
      <div class="row mb-3" id="confirm_div">
-      <label for="password" class="col-sm-4 col-form-label">Confirm</label>
+      <label for="password" class="col-sm-3 col-form-label text-end">Confirm</label>
       <div class="col-sm-6">
        <input type="password" class="form-control" id="confirm" name="password_match" onkeyup="check_passwords_match()">
       </div>
      </div>
 
-     <div class="row mb-3">
+     <div class="text-center mb-3">
        <button type="submit" class="btn btn-secondary">Change password</button>
      </div>
      
     </form>
 
-    <div class="progress">
-     <div id="StrengthProgressBar" class="progress progress-bar"></div>
+    <?php if ($PASSWORD_POLICY_ENABLED) { ?>
+    <!-- Password Requirements Checklist -->
+    <div class="card mt-3">
+      <div class="card-header"><small><strong>Password requirements</strong></small></div>
+      <div class="card-body" id="PasswordRequirements">
+        <!-- Requirements will be dynamically inserted here -->
+      </div>
     </div>
+
+    <script>
+      // Initialize password requirements checker
+      document.addEventListener('DOMContentLoaded', function() {
+        window.passwordRequirements = {
+          minLength: <?php echo (int)$PASSWORD_MIN_LENGTH; ?>,
+          requireUppercase: <?php echo $PASSWORD_REQUIRE_UPPERCASE ? 'true' : 'false'; ?>,
+          requireLowercase: <?php echo $PASSWORD_REQUIRE_LOWERCASE ? 'true' : 'false'; ?>,
+          requireNumbers: <?php echo $PASSWORD_REQUIRE_NUMBERS ? 'true' : 'false'; ?>,
+          requireSpecial: <?php echo $PASSWORD_REQUIRE_SPECIAL ? 'true' : 'false'; ?>
+        };
+        initPasswordRequirements('password', window.passwordRequirements);
+      });
+    </script>
+    <?php } else { ?>
+    <!-- Password Strength Meter (fallback when policy not enabled) -->
+    <div class="progress mt-3">
+      <div id="StrengthProgressBar" class="progress progress-bar"></div>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        initPasswordStrength('password');
+      });
+    </script>
+    <?php } ?>
 
    </div>
   </div>

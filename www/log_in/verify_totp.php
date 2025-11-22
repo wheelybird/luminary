@@ -113,11 +113,11 @@ render_header("$ORGANISATION_NAME account manager - Verify MFA");
 ?>
 <div class="container">
  <div class="row justify-content-center">
-  <div class="col-sm-6">
+  <div class="col-md-8">
 
    <div class="card">
    <div class="card-header text-center">
-     <h5 class="mb-0">Multi-Factor Authentication</h5>
+     <h5 class="mb-0">Multi-factor authentication</h5>
    </div>
    <div class="card-body">
 
@@ -134,7 +134,7 @@ render_header("$ORGANISATION_NAME account manager - Verify MFA");
    <form class="form-horizontal" action="" method="post">
 
     <div class="row mb-3">
-     <label for="totp_code" class="col-sm-4 col-form-label">Verification Code</label>
+     <label for="totp_code" class="col-sm-4 col-form-label text-end">Verification Code</label>
      <div class="col-sm-8">
       <input type="text"
              class="form-control form-control-lg text-center"
