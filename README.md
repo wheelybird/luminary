@@ -12,17 +12,17 @@ This project complements [openvpn-server-ldap-otp](https://github.com/wheelybird
 
 ## Features
 
-- **Setup Wizard**: Automatically creates the necessary LDAP structure and initial admin user
-- **User Management**: Create, edit, and delete user accounts with ease
-- **Group Management**: Organise users into groups with flexible membership controls
-- **Self-Service Password Change**: Users can securely update their own passwords
-- **Multi-Factor Authentication**: Self-service TOTP enrolment with QR code generation
-- **Email Notifications**: Optional email delivery for new account credentials
-- **Password Tools**: Secure password generator and strength indicator
-- **Account Requests**: Allow users to request accounts via a web form
+- **Setup wizard**: Automatically creates the necessary LDAP structure and initial admin user
+- **User management**: Create, edit, and delete user accounts with ease
+- **Group management**: Organise users into groups with flexible membership controls
+- **Self-service password change**: Users can securely update their own passwords
+- **Multi-factor authentication**: Self-service TOTP enrolment with QR code generation
+- **Email notifications**: Optional email delivery for new account credentials
+- **Password tools**: Secure password generator and strength indicator
+- **Account requests**: Allow users to request accounts via a web form
 - **Customisable**: Brand the interface with your organisation's logo and styling
 
-## Quick Start
+## Quick start
 
 This example shows how to run Luminary for testing, using osixia/openldap:
 
@@ -57,10 +57,10 @@ docker run \
   -e LDAP_ADMIN_BIND_PWD="admin_password" \
   -e LDAP_IGNORE_CERT_ERRORS="true" \
   --link openldap:openldap \
-  wheelybird/luminary:latest
+  wheelybird/luminary:v1.0.0
 ```
 
-### 3. Run the Setup Wizard
+### 3. Run the setup wizard
 
 Visit https://localhost:8443/setup (accept the self-signed certificate warning) and follow the wizard to:
 - Verify LDAP connectivity
@@ -68,7 +68,7 @@ Visit https://localhost:8443/setup (accept the self-signed certificate warning) 
 - Create the admins group
 - Create your first admin user
 
-### 4. Log In
+### 4. Log in
 
 Once setup is complete, you can log in at https://localhost:8443 with your admin credentials.
 
@@ -78,11 +78,11 @@ Luminary is configured entirely through environment variables. The main categori
 
 | Documentation | Description |
 |---------------|-------------|
-| [Configuration Reference](docs/configuration.md) | Complete list of all environment variables with descriptions and defaults |
-| [Multi-Factor Authentication](docs/mfa.md) | Setting up and using MFA/TOTP authentication |
-| [Advanced Topics](docs/advanced.md) | HTTPS certificates, custom attributes, email setup, and more |
+| [Configuration reference](docs/configuration.md) | Complete list of all environment variables with descriptions and defaults |
+| [Multi-factor authentication](docs/mfa.md) | Setting up and using MFA/TOTP authentication |
+| [Advanced topics](docs/advanced.md) | HTTPS certificates, custom attributes, email setup, and more |
 
-### Essential Configuration
+### Essential configuration
 
 The following environment variables are required:
 
@@ -93,7 +93,7 @@ The following environment variables are required:
 
 All other settings have sensible defaults. For example, the admin group defaults to `admins` and can be changed with `LDAP_ADMINS_GROUP`.
 
-### Using Secrets
+### Using secrets
 
 For sensitive values like passwords, you can use Docker secrets or mounted files. Append `_FILE` to any variable name and point it to a file containing the value:
 
@@ -101,7 +101,7 @@ For sensitive values like passwords, you can use Docker secrets or mounted files
 -e LDAP_ADMIN_BIND_PWD_FILE=/run/secrets/ldap_admin_password
 ```
 
-## Multi-Factor Authentication
+## Multi-factor authentication
 
 Luminary includes comprehensive MFA support with LDAP-backed TOTP (Time-based One-Time Passwords):
 
@@ -125,11 +125,11 @@ This project is designed to work alongside [openvpn-server-ldap-otp](https://git
 
 Together, these projects provide a complete, centralised authentication solution.
 
-## Development and Contributions
+## Development and contributions
 
 This is an open-source project. Contributions, bug reports, and feature requests are welcome via GitHub issues and pull requests.
 
-### Building from Source
+### Building from source
 
 ```bash
 git clone https://github.com/wheelybird/luminary.git
@@ -147,7 +147,7 @@ docker build -t luminary .
 
 This project is licensed under the MIT Licence. See the LICENCE file for details.
 
-## Related Projects
+## Related projects
 
 - [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp) - OpenVPN server with LDAP authentication and MFA support
 - [ldap-totp-schema](https://github.com/wheelybird/ldap-totp-schema) - LDAP schema for storing TOTP configuration
