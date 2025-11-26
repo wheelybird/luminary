@@ -37,8 +37,10 @@ if (! array_key_exists($LDAP['account_attribute'], $attribute_map)) {
 
 if (!isset($_POST['account_identifier']) and !isset($_GET['account_identifier'])) {
 ?>
- <div class="alert alert-danger">
-  <p class="text-center">The account identifier is missing.</p>
+ <div class="container">
+  <div class="alert alert-danger">
+   <p class="text-center">The account identifier is missing.</p>
+  </div>
  </div>
 <?php
 render_footer();
@@ -128,48 +130,58 @@ if ($ldap_search) {
  }
  else {
    ?>
-    <div class="alert alert-danger">
-     <p class="text-center">This account doesn't exist.</p>
+    <div class="container">
+     <div class="alert alert-danger">
+      <p class="text-center">This account doesn't exist.</p>
+     </div>
     </div>
    <?php
    render_footer();
    exit(0);
  }
 
+?>
+<div class="container">
+<?php
+
  if ($weak_password) { ?>
- <div class="alert alert-warning">
-  <p class="text-center">The password wasn't strong enough.</p>
- </div>
+  <div class="alert alert-warning">
+   <p class="text-center">The password wasn't strong enough.</p>
+  </div>
  <?php }
 
  if ($invalid_password) {  ?>
- <div class="alert alert-warning">
-  <p class="text-center">The password contained invalid characters.</p>
- </div>
+  <div class="alert alert-warning">
+   <p class="text-center">The password contained invalid characters.</p>
+  </div>
  <?php }
 
  if ($mismatched_passwords) {  ?>
- <div class="alert alert-warning">
-  <p class="text-center">The passwords didn't match.</p>
- </div>
+  <div class="alert alert-warning">
+   <p class="text-center">The passwords didn't match.</p>
+  </div>
  <?php }
 
  if (isset($password_fails_policy) && $password_fails_policy && !empty($password_policy_errors)) { ?>
- <div class="alert alert-warning">
-  <p class="text-center"><strong>Password Policy Errors:</strong></p>
-  <ul>
-   <?php foreach ($password_policy_errors as $policy_error) { ?>
-     <li><?php echo htmlspecialchars($policy_error); ?></li>
-   <?php } ?>
-  </ul>
- </div>
+  <div class="alert alert-warning">
+   <p class="text-center"><strong>Password Policy Errors:</strong></p>
+   <ul>
+    <?php foreach ($password_policy_errors as $policy_error) { ?>
+      <li><?php echo htmlspecialchars($policy_error); ?></li>
+    <?php } ?>
+   </ul>
+  </div>
  <?php }
 
  if (isset($password_in_history) && $password_in_history) { ?>
- <div class="alert alert-warning">
-  <p class="text-center">This password was used recently and cannot be reused.</p>
- </div>
+  <div class="alert alert-warning">
+   <p class="text-center">This password was used recently and cannot be reused.</p>
+  </div>
  <?php }
+
+?>
+</div>
+<?php
 
 
  ################################################

@@ -476,11 +476,6 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
 
  $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
- // Ensure group_membership_attribute is set
- if (!isset($LDAP['group_membership_attribute'])) {
-  $LDAP['group_membership_attribute'] = 'memberuid';
- }
-
  $ldap_search_query = "({$LDAP['group_attribute']}=". ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
  $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query, array($LDAP['group_membership_attribute']));
 
@@ -496,11 +491,16 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
 
  if ($result_count > 0) {
 
-  // Check if the membership attribute exists in the result
-  if (isset($result[0][$LDAP['group_membership_attribute']]) && is_array($result[0][$LDAP['group_membership_attribute']])) {
-   foreach ($result[0][$LDAP['group_membership_attribute']] as $key => $value) {
+  // Check if the membership attribute exists in the result (use lowercase key)
+  $membership_attr = strtolower($LDAP['group_membership_attribute']);
+  if (isset($result[0][$membership_attr]) && is_array($result[0][$membership_attr])) {
+   foreach ($result[0][$membership_attr] as $key => $value) {
 
     if ($key !== 'count' and !empty($value)) {
+     // Skip placeholder member for RFC2307bis
+     if ($value === "cn=placeholder") {
+      continue;
+     }
      $this_member = preg_replace("/^.*?=(.*?),.*/", "$1", $value);
      array_push($records, $this_member);
      if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix {$value} is a member",0); }
@@ -537,16 +537,29 @@ function ldap_is_group_member($ldap_connection,$group_name,$username) {
  $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
  $ldap_search_query = "({$LDAP['group_attribute']}=" . ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
- $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query);
+ // Explicitly request the membership attribute
+ $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query, array($LDAP['group_membership_attribute']));
 
  if ($ldap_search) {
    $result = ldap_get_entries($ldap_connection, $ldap_search);
+
+   // Check if group exists
+   if ($result['count'] == 0) {
+     return FALSE;
+   }
 
    if ($LDAP['group_membership_uses_uid'] == FALSE) {
      $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
    }
 
-   if (preg_grep ("/^{$username}$/i", $result[0][$LDAP['group_membership_attribute']])) {
+   // Check if membership attribute exists in the result
+   $membership_attr = strtolower($LDAP['group_membership_attribute']);
+   if (!isset($result[0][$membership_attr])) {
+     return FALSE;
+   }
+
+   // Placeholder member should never match a real user
+   if (preg_grep ("/^{$username}$/i", $result[0][$membership_attr])) {
      return TRUE;
    }
    else {
@@ -614,9 +627,40 @@ function ldap_new_group($ldap_connection,$group_name,$initial_member="",$extra_a
                              'cn' => $new_group
                            );
 
-     // Only add membership attribute if initial_member is not empty (fixes #230 - empty group creation)
-     if ($initial_member != "") {
-       $new_group_array[$LDAP['group_membership_attribute']] = $initial_member;
+     // RFC2307bis requires a structural objectClass and at least one member
+     if ($rfc2307bis_available == TRUE) {
+       $has_structural_class = false;
+       $member_attribute = 'member';
+
+       // Check if a structural class is already present
+       if (in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+         $has_structural_class = true;
+         $member_attribute = 'member';
+       }
+       elseif (in_array('groupOfUniqueNames', $LDAP['group_objectclasses'])) {
+         $has_structural_class = true;
+         $member_attribute = 'uniqueMember';
+       }
+
+       // Add groupOfNames if no structural class is present
+       if (!$has_structural_class) {
+         $new_group_array['objectClass'][] = 'groupOfNames';
+         $member_attribute = 'member';
+       }
+
+       // Structural class requires at least one member, use placeholder if empty
+       if ($initial_member == "") {
+         $new_group_array[$member_attribute] = "cn=placeholder";
+       }
+       else {
+         $new_group_array[$member_attribute] = $initial_member;
+       }
+     }
+     else {
+       // RFC2307 - only add membership attribute if initial_member is not empty (fixes #230 - empty group creation)
+       if ($initial_member != "" && isset($LDAP['group_membership_attribute'])) {
+         $new_group_array[$LDAP['group_membership_attribute']] = $initial_member;
+       }
      }
 
      $new_group_array = array_merge($new_group_array,$extra_attributes);
@@ -1011,6 +1055,17 @@ function ldap_add_member_to_group($ldap_connection,$group_name,$username) {
    $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
   }
 
+  // For RFC2307bis, check if placeholder exists and remove it before adding real member
+  if ($rfc2307bis_available) {
+   $members = ldap_get_group_members($ldap_connection, $group_name);
+   if (empty($members)) {
+    // Group is empty (only has placeholder), remove placeholder first
+    $remove_placeholder = array($LDAP['group_membership_attribute'] => "cn=placeholder");
+    @ ldap_mod_del($ldap_connection,$group_dn,$remove_placeholder);
+    if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Removed placeholder from group '$group_name'",0); }
+   }
+  }
+
   $group_update = array($LDAP['group_membership_attribute'] => $username);
   $update = @ ldap_mod_add($ldap_connection,$group_dn,$group_update);
 
@@ -1051,6 +1106,23 @@ function ldap_delete_member_from_group($ldap_connection,$group_name,$username) {
 
     if ($update) {
      error_log("$log_prefix Removed '$username' from $group_name",0);
+
+     // For RFC2307bis, add placeholder if group is now empty
+     if ($rfc2307bis_available) {
+      $members = ldap_get_group_members($ldap_connection, $group_name);
+      if (empty($members)) {
+       // Group is now empty, add placeholder back
+       $add_placeholder = array($LDAP['group_membership_attribute'] => "cn=placeholder");
+       $placeholder_add = @ ldap_mod_add($ldap_connection,$group_dn,$add_placeholder);
+       if ($placeholder_add) {
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Added placeholder to empty group '$group_name'",0); }
+       }
+       else {
+        error_log("$log_prefix Warning: Couldn't add placeholder to empty group '$group_name': " . ldap_error($ldap_connection),0);
+       }
+      }
+     }
+
      return TRUE;
     }
     else {
@@ -1163,17 +1235,61 @@ function ldap_detect_rfc2307bis($ldap_connection) {
       }
     }
 
+    // Auto-configure group membership attributes if RFC2307bis is detected
+    // This maintains backward compatibility and ease-of-use
     if ($LDAP['rfc2307bis_available'] == TRUE) {
-      if (!isset($LDAP['group_membership_attribute'])) { $LDAP['group_membership_attribute'] = 'uniquemember'; }
-      if (!isset($LDAP['group_membership_uses_uid'])) { $LDAP['group_membership_uses_uid'] = FALSE; }
-      if (!in_array('groupOfUniqueNames',$LDAP['group_objectclasses'])) { array_push($LDAP['group_objectclasses'], 'groupOfUniqueNames'); }
-      return TRUE;
+
+      // Add groupOfUniqueNames objectclass if admin hasn't explicitly configured objectclasses
+      // and it's not already present
+      if (!getenv('LDAP_GROUP_ADDITIONAL_OBJECTCLASSES') &&
+          !in_array('groupOfUniqueNames', $LDAP['group_objectclasses']) &&
+          !in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-adding groupOfUniqueNames to group objectclasses for RFC2307bis",0); }
+        $LDAP['group_objectclasses'][] = 'groupOfUniqueNames';
+      }
+
+      // Auto-set membership attribute based on objectclasses if admin hasn't explicitly set it
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE') && !isset($LDAP['group_membership_attribute'])) {
+        if (in_array('groupOfUniqueNames', $LDAP['group_objectclasses'])) {
+          $LDAP['group_membership_attribute'] = 'uniqueMember';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to uniqueMember for RFC2307bis",0); }
+        }
+        elseif (in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+          $LDAP['group_membership_attribute'] = 'member';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to member for RFC2307bis",0); }
+        }
+        else {
+          $LDAP['group_membership_attribute'] = 'memberUid';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to memberUid (RFC2307)",0); }
+        }
+      }
+
+      // Auto-set group_membership_uses_uid based on membership attribute if admin hasn't explicitly set it
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_USES_UID') && !isset($LDAP['group_membership_uses_uid'])) {
+        if (isset($LDAP['group_membership_attribute']) && strtolower($LDAP['group_membership_attribute']) == 'memberuid') {
+          $LDAP['group_membership_uses_uid'] = TRUE;
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to TRUE",0); }
+        }
+        else {
+          $LDAP['group_membership_uses_uid'] = FALSE;
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to FALSE",0); }
+        }
+      }
     }
     else {
-      if (!isset($LDAP['group_membership_attribute'])) { $LDAP['group_membership_attribute'] = 'memberuid'; }
-      if (!isset($LDAP['group_membership_uses_uid'])) { $LDAP['group_membership_uses_uid'] = TRUE; }
-      return FALSE;
+      // RFC2307 (not BIS) - set defaults if not already configured
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE') && !isset($LDAP['group_membership_attribute'])) {
+        $LDAP['group_membership_attribute'] = 'memberUid';
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to memberUid (RFC2307)",0); }
+      }
+
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_USES_UID') && !isset($LDAP['group_membership_uses_uid'])) {
+        $LDAP['group_membership_uses_uid'] = TRUE;
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to TRUE (RFC2307)",0); }
+      }
     }
+
+    return $LDAP['rfc2307bis_available'];
 
   }
 

@@ -26,24 +26,30 @@ else {
 
  if (isset($_GET["invalid"])) {
  ?>
- <div class="alert alert-warning">
-  <p class="text-center">The password was incorrect.</p>
+ <div class="container">
+  <div class="alert alert-warning">
+   <p class="text-center">The password was incorrect.</p>
+  </div>
  </div>
  <?php
  }
  ?>
  <div class="container">
-  <div class="card">
-   <div class="card-header text-center">Password for <?php print $LDAP['admin_bind_dn']; ?></div>
-   <div class="card-body text-center">
-    <form class="form-inline" action='' method='post'>
-     <div class="row mb-3">
-      <input type='password' class="form-control" name='admin_password'>
+  <div class="row justify-content-center">
+   <div class="col-md-6 col-lg-4">
+    <div class="card">
+     <div class="card-header text-center">Password for <?php print $LDAP['admin_bind_dn']; ?></div>
+     <div class="card-body">
+      <form action='' method='post'>
+       <div class="mb-3">
+        <input type='password' class="form-control" name='admin_password' placeholder='Password' autofocus>
+       </div>
+       <div class="d-grid">
+        <input type='submit' class="btn btn-secondary" value='Log in'>
+       </div>
+      </form>
      </div>
-     <div class="row mb-3">
-      <input type='submit' class="btn btn-secondary" value='Log in'>
-     </div>
-    </form>
+    </div>
    </div>
   </div>
  </div>

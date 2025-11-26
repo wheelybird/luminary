@@ -1025,6 +1025,7 @@ Debug modes and verbose logging
 | Enable LDAP debug logging<br><small>WARNING: May expose sensitive information</small> | ✅ boolean | `FALSE` | `LDAP_DEBUG` | Enable LDAP debug logging |
 | Verbose LDAP connection logs<br><small>Log all LDAP connection details</small> | ✅ boolean | `FALSE` | `LDAP_VERBOSE_CONNECTION_LOGS` | Verbose LDAP connection logs |
 | Enable session debug logging<br><small>Log session management details</small> | ✅ boolean | `FALSE` | `SESSION_DEBUG` | Enable session debug logging |
+| Show detailed error messages<br><small>Display full error details in browser (development only). Set to FALSE in production to show generic error pages.</small> | ✅ boolean | `FALSE` | `SHOW_ERROR_DETAILS` | Show detailed error messages |
 | SMTP debug level<br><small>0=off, 1=client, 2=client+server, 3=verbose, 4=very verbose</small> | integer | 📝 `0` | `SMTP_LOG_LEVEL` | SMTP debug level |
 
 ### Details
@@ -1054,6 +1055,16 @@ Log all LDAP connection details
 Log session management details
 
 **Environment Variable:** `SESSION_DEBUG`
+
+**Default:** `FALSE`
+
+---
+
+#### Show detailed error messages
+
+Display full error details in browser (development only). Set to FALSE in production to show generic error pages.
+
+**Environment Variable:** `SHOW_ERROR_DETAILS`
 
 **Default:** `FALSE`
 
@@ -1131,4 +1142,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2025-11-22 12:19:24 UTC*
+*Last updated: 2025-11-26 18:31:45 UTC*

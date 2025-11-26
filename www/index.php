@@ -7,8 +7,10 @@ render_header();
 
  if (isset($_GET['logged_in'])) {
  ?>
- <div class="alert alert-success">
- <p class="text-center">You're logged in. Select from the menu above.</p>
+ <div class="container">
+  <div class="alert alert-success">
+   <p class="text-center">You're logged in. Select from the menu above.</p>
+  </div>
  </div>
  <?php
  }

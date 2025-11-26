@@ -19,6 +19,145 @@ $FAIL_ICON = "&#9940;";
 
 $JS_EMAIL_REGEX='/^[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}$/u;';
 
+######################################################
+# ERROR HANDLING - Set up custom error/exception handlers
+######################################################
+
+/**
+ * Custom error handler - logs detailed errors but shows generic message to user
+ */
+function custom_error_handler($errno, $errstr, $errfile, $errline) {
+  // Don't handle suppressed errors (@-operator)
+  if (!(error_reporting() & $errno)) {
+    return false;
+  }
+
+  // Map error types to readable names
+  $error_types = array(
+    E_ERROR => 'Error',
+    E_WARNING => 'Warning',
+    E_PARSE => 'Parse Error',
+    E_NOTICE => 'Notice',
+    E_CORE_ERROR => 'Core Error',
+    E_CORE_WARNING => 'Core Warning',
+    E_COMPILE_ERROR => 'Compile Error',
+    E_COMPILE_WARNING => 'Compile Warning',
+    E_USER_ERROR => 'User Error',
+    E_USER_WARNING => 'User Warning',
+    E_USER_NOTICE => 'User Notice',
+    E_STRICT => 'Strict Notice',
+    E_RECOVERABLE_ERROR => 'Recoverable Error',
+    E_DEPRECATED => 'Deprecated',
+    E_USER_DEPRECATED => 'User Deprecated'
+  );
+
+  $error_type = isset($error_types[$errno]) ? $error_types[$errno] : 'Unknown Error';
+
+  // Log detailed error message to stderr (Docker logs)
+  $log_message = "PHP $error_type: $errstr in $errfile on line $errline";
+  fwrite(STDERR, date('[Y-m-d H:i:s] ') . $log_message . "\n");
+
+  // For fatal errors, show generic error page
+  if ($errno == E_ERROR || $errno == E_USER_ERROR || $errno == E_RECOVERABLE_ERROR) {
+    show_generic_error_page($log_message);
+    exit(1);
+  }
+
+  // Don't execute PHP's internal error handler
+  return true;
+}
+
+/**
+ * Custom exception handler - logs exception details but shows generic message to user
+ */
+function custom_exception_handler($exception) {
+  // Log detailed exception information to stderr (Docker logs)
+  $log_message = "Uncaught Exception: " . $exception->getMessage() . "\n" .
+                 "File: " . $exception->getFile() . " on line " . $exception->getLine() . "\n" .
+                 "Stack trace:\n" . $exception->getTraceAsString();
+  fwrite(STDERR, date('[Y-m-d H:i:s] ') . $log_message . "\n");
+
+  // Show generic error page to user
+  show_generic_error_page($log_message);
+  exit(1);
+}
+
+/**
+ * Display a generic error page to the user
+ *
+ * @param string $error_details Optional error details to show in development mode
+ */
+function show_generic_error_page($error_details = '') {
+  // Check if we should show error details (for development)
+  $show_details = (strcasecmp(getenv('SHOW_ERROR_DETAILS'), 'TRUE') == 0);
+
+  // Clear any output buffers
+  if (ob_get_level()) {
+    ob_clean();
+  }
+
+  // Send HTTP 500 status
+  http_response_code(500);
+
+  // Display generic error page
+  ?>
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Error</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="container mt-5">
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+          <div class="card border-danger">
+            <div class="card-header bg-danger text-white text-center">
+              <h4>System Error</h4>
+            </div>
+            <div class="card-body">
+              <p class="text-center">An unexpected error has occurred. Please try again later.</p>
+              <p class="text-center text-muted">If this problem persists, please contact your system administrator.</p>
+
+              <?php if ($show_details && !empty($error_details)): ?>
+              <div class="alert alert-warning mt-3">
+                <strong>Error Details (development mode):</strong>
+                <pre class="mt-2 mb-0" style="font-size: 0.85em; max-height: 300px; overflow-y: auto;"><?php echo htmlspecialchars($error_details); ?></pre>
+              </div>
+              <?php endif; ?>
+
+              <p class="text-center mt-4">
+                <a href="/" class="btn btn-primary">Return to Home</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+  </html>
+  <?php
+}
+
+// Set custom error and exception handlers
+set_error_handler('custom_error_handler');
+set_exception_handler('custom_exception_handler');
+
+// Configure PHP error reporting
+// All errors are logged to stderr (captured by Docker logs)
+// display_errors should be Off in production (set in php.ini)
+// We handle errors through our custom handlers above which write to stderr
+error_reporting(E_ALL);
+
+// Ensure PHP errors also go to stderr for Docker logging
+// This catches any errors not handled by our custom handler
+ini_set('error_log', 'php://stderr');
+ini_set('log_errors', '1');
+
+######################################################
+
 if (isset($_SERVER['HTTPS']) and
    ($_SERVER['HTTPS'] == 'on' || $_SERVER['HTTPS'] == 1) or
    isset($_SERVER['HTTP_X_FORWARDED_PROTO']) and
@@ -1077,16 +1216,18 @@ function render_alert_banner($message,$alert_class="success",$timeout=4000) {
 ?>
     <script>
       window.setTimeout(function() {
-        const alert = document.querySelector('.alert');
+        const alert = document.querySelector('.alert-banner-container .alert');
         if (alert) {
           const bsAlert = new bootstrap.Alert(alert);
           bsAlert.close();
         }
       }, <?php print $timeout; ?>);
     </script>
-    <div class="alert alert-<?php print $alert_class; ?> alert-dismissible fade show" role="alert">
-     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-     <p class="text-center"><?php print $message; ?></p>
+    <div class="container alert-banner-container">
+     <div class="alert alert-<?php print $alert_class; ?> alert-dismissible fade show" role="alert">
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <p class="text-center"><?php print $message; ?></p>
+     </div>
     </div>
 <?php
 }

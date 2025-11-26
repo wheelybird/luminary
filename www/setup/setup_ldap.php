@@ -145,7 +145,7 @@ if (isset($_POST['fix_problems'])) {
   <input type="hidden" name="setup_admin_account">
   <?php
   print "$li_fail The LDAP administration group is empty. ";
-  print "<a href='#' data-bs-toggle='popover' title='LDAP account administrators' data-content='";
+  print "<a href='#' data-bs-toggle='popover' data-bs-trigger='hover focus' title='LDAP account administrators' data-bs-content='";
   print "Only members of this group ({$LDAP['admins_group']}) will be able to access the account managment section, so we need to add people to it.";
   print "'>What's this?</a>";
   print "<label class='float-end'><input type='checkbox' name='setup_admin_account' class='float-end' checked>Create a new account and add it to the admin group?&nbsp;</label>";
@@ -169,28 +169,28 @@ if (isset($_POST['fix_problems'])) {
   if ($show_create_admin_button == FALSE) {
  ?>
  </form>
- <div class='well'>
-  <form action="<?php print $THIS_MODULE_PATH; ?>">
-   <input type='submit' class="btn btn-success center-block" value='Finished' class='center-block'>
+ <div class='mt-3 text-end'>
+  <form action="<?php print $THIS_MODULE_PATH; ?>" class="d-inline">
+   <input type='submit' class="btn btn-success" value='Finished'>
   </form>
  </div>
  <?php
   }
   else {
   ?>
-    <div class='well'>
-    <input type='submit' class="btn btn-warning center-block" value='Create new account >' class='center-block'>
+    <div class='mt-3 text-end'>
+    <input type='submit' class="btn btn-warning" value='Create new account >'>
    </form>
   </div>
-  <?php 
+  <?php
   }
  }
  else {
  ?>
  </form>
- <div class='well'>
-  <form action="<?php print $THIS_MODULE_PATH; ?>/run_checks.php">
-   <input type='submit' class="btn btn-danger center-block" value='< Re-run setup' class='center-block'>
+ <div class='mt-3 text-start'>
+  <form action="<?php print $THIS_MODULE_PATH; ?>/run_checks.php" class="d-inline">
+   <input type='submit' class="btn btn-danger" value='< Re-run setup'>
   </form>
  </div>
 <?php

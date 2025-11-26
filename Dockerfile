@@ -26,7 +26,7 @@ RUN a2enmod rewrite ssl && a2dissite 000-default default-ssl
 EXPOSE 80
 EXPOSE 443
 
-COPY www/ /opt/ldap_user_manager
+COPY www/ /opt/luminary
 RUN tar -xzf /tmp/v7.0.0.tar.gz -C /opt && mv /opt/PHPMailer-7.0.0 /opt/PHPMailer
 
 COPY entrypoint /usr/local/bin/entrypoint

@@ -22,8 +22,10 @@ $ldap_connection = open_ldap_connection();
 
 if (!isset($_POST['group_name']) and !isset($_GET['group_name'])) {
 ?>
- <div class="alert alert-danger">
-  <p class="text-center">The group name is missing.</p>
+ <div class="container">
+  <div class="alert alert-danger">
+   <p class="text-center">The group name is missing.</p>
+  </div>
  </div>
 <?php
  render_footer();
@@ -36,8 +38,10 @@ else {
 
 if ($ENFORCE_SAFE_SYSTEM_NAMES == TRUE and !preg_match("/$USERNAME_REGEX/u",$group_cn)) {
 ?>
- <div class="alert alert-danger">
-  <p class="text-center">The group name is invalid.</p>
+ <div class="container">
+  <div class="alert alert-danger">
+   <p class="text-center">The group name is invalid.</p>
+  </div>
  </div>
 <?php
  render_footer();

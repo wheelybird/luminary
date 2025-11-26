@@ -52,7 +52,7 @@ The configuration documentation is automatically generated from the configuratio
 ### From within Docker container:
 
 ```bash
-docker exec -it <container-name> php /opt/ldap_user_manager/docs/generate_config_docs.php
+docker exec -it <container-name> php /opt/luminary/docs/generate_config_docs.php
 ```
 
 ### From host with PHP installed:

@@ -166,10 +166,6 @@ EOF
 Luminary automatically detects if ppolicy overlay is available. To test manually:
 
 ```bash
-# Via Luminary test script
-docker exec luminary php /opt/ldap_user_manager/test_ppolicy_detection.php
-
-# Via ldapsearch
 ldapsearch -x -H ldap://localhost -b "" -s base "(objectClass=*)" supportedControl | grep 1.3.6.1.4.1.42.2.27.8.5.1
 ```
 

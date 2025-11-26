@@ -9,7 +9,11 @@ render_header("$ORGANISATION_NAME - request an account");
 
 if ($ACCOUNT_REQUESTS_ENABLED == FALSE) {
 
-?><div class='alert alert-warning'><p class='text-center'>Account requesting is disabled.</p></div><?php
+?>
+<div class="container">
+ <div class='alert alert-warning'><p class='text-center'>Account requesting is disabled.</p></div>
+</div>
+<?php
 
 render_footer();
 exit(0);
@@ -48,16 +52,18 @@ if($_POST) {
 
 
   if (count($error_messages) > 0) { ?>
-    <div class="alert alert-danger" role="alert">
-    The request couldn't be sent because:
-    <p>
-    <ul>
-      <?php
-       foreach($error_messages as $message) {
-         print "<li>$message</li>\n";
-       }
-      ?>
-    </ul>
+    <div class="container">
+     <div class="alert alert-danger" role="alert">
+      The request couldn't be sent because:
+      <p>
+      <ul>
+        <?php
+         foreach($error_messages as $message) {
+           print "<li>$message</li>\n";
+         }
+        ?>
+      </ul>
+     </div>
     </div>
   <?php
   }

@@ -38,8 +38,10 @@ docker run \
   -e LDAP_DOMAIN="example.com" \
   -e LDAP_ADMIN_PASSWORD="admin_password" \
   -e LDAP_TLS_VERIFY_CLIENT="never" \
+  -e LDAP_RFC2307BIS_SCHEMA="true" \
   osixia/openldap:latest
 ```
+> **Note:** if you want to enable MFA support then follow the [quick set-up guide for ldap-totp-schema](https://github.com/wheelybird/ldap-totp-schema?tab=readme-ov-file#quick-setup) which provides instructions for running the **osixia/openldap** container with support for the TOTP schema (which stores MFA information in LDAP).
 
 ### 2. Start Luminary
 
@@ -52,12 +54,12 @@ docker run \
   -e SERVER_HOSTNAME="localhost" \
   -e LDAP_URI="ldap://openldap:389" \
   -e LDAP_BASE_DN="dc=example,dc=com" \
-  -e LDAP_REQUIRE_STARTTLS="TRUE" \
+  -e LDAP_REQUIRE_STARTTLS="true" \
   -e LDAP_ADMIN_BIND_DN="cn=admin,dc=example,dc=com" \
   -e LDAP_ADMIN_BIND_PWD="admin_password" \
   -e LDAP_IGNORE_CERT_ERRORS="true" \
   --link openldap:openldap \
-  wheelybird/luminary:v1.0.0
+  wheelybird/luminary:v2.0.0
 ```
 
 ### 3. Run the setup wizard

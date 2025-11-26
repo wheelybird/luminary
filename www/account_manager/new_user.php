@@ -288,8 +288,10 @@ if (isset($_POST['create_account'])) {
     if ($admin_setup == TRUE) {
       $member_add = ldap_add_member_to_group($ldap_connection, $LDAP['admins_group'], $account_identifier);
       if (!$member_add) { ?>
-       <div class="alert alert-warning">
-        <p class="text-center"><?php print $creation_message; ?> Unfortunately adding it to the admin group failed.</p>
+       <div class="container">
+        <div class="alert alert-warning">
+         <p class="text-center"><?php print $creation_message; ?> Unfortunately adding it to the admin group failed.</p>
+        </div>
        </div>
        <?php
       }
@@ -300,14 +302,16 @@ if (isset($_POST['create_account'])) {
     }
 
    ?>
-   <div class="alert alert-success">
-   <p class="text-center"><?php print $creation_message; ?></p>
+   <div class="container">
+    <div class="alert alert-success">
+     <p class="text-center"><?php print $creation_message; ?></p>
+    </div>
+    <form action='<?php print $completed_action; ?>'>
+     <p align="center">
+      <input type='submit' class="btn btn-success" value='Finished'>
+     </p>
+    </form>
    </div>
-   <form action='<?php print $completed_action; ?>'>
-    <p align="center">
-     <input type='submit' class="btn btn-success" value='Finished'>
-    </p>
-   </form>
    <?php
    render_footer();
    exit(0);
@@ -317,15 +321,17 @@ if (isset($_POST['create_account'])) {
     $error_msg = ldap_error($ldap_connection);
     audit_log('user_create_failure', $account_identifier, "Failed to create user: {$error_msg}", 'failure', $USER_ID);
   ?>
-    <div class="alert alert-warning">
-     <p class="text-center">Failed to create the account:</p>
-     <pre>
-     <?php
-       print $error_msg . "\n";
-       ldap_get_option($ldap_connection, LDAP_OPT_DIAGNOSTIC_MESSAGE, $detailed_err);
-       print $detailed_err;
-     ?>
-     </pre>
+    <div class="container">
+     <div class="alert alert-warning">
+      <p class="text-center">Failed to create the account:</p>
+      <pre>
+      <?php
+        print $error_msg . "\n";
+        ldap_get_option($ldap_connection, LDAP_OPT_DIAGNOSTIC_MESSAGE, $detailed_err);
+        print $detailed_err;
+      ?>
+      </pre>
+     </div>
     </div>
     <?php
 
@@ -355,13 +361,15 @@ if ($password_fails_policy && !empty($password_policy_errors)) {
 }
 
 if ($errors != "") { ?>
-<div class="alert alert-warning">
- <p class="text-align: center">
- There were issues creating the account:
- <ul>
- <?php print $errors; ?>
- </ul>
- </p>
+<div class="container">
+ <div class="alert alert-warning">
+  <p class="text-align: center">
+  There were issues creating the account:
+  <ul>
+  <?php print $errors; ?>
+  </ul>
+  </p>
+ </div>
 </div>
 <?php
 }

@@ -1095,6 +1095,17 @@ $CONFIG_REGISTRY = array(
     'variable' => '$SESSION_DEBUG'
   ),
 
+  'SHOW_ERROR_DETAILS' => array(
+    'category' => 'debug',
+    'description' => 'Show detailed error messages',
+    'help' => 'Display full error details in browser (development only). Set to FALSE in production to show generic error pages.',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'SHOW_ERROR_DETAILS',
+    'variable' => '$SHOW_ERROR_DETAILS'
+  ),
+
   'SMTP_LOG_LEVEL' => array(
     'category' => 'debug',
     'description' => 'SMTP debug level',
@@ -1189,9 +1200,14 @@ if (getenv('LDAP_GROUP_ADDITIONAL_ATTRIBUTES')) {
   $LDAP['group_additional_attributes'] = getenv('LDAP_GROUP_ADDITIONAL_ATTRIBUTES');
 }
 
+// Admin can explicitly override membership attribute
+// If not set, it will be auto-configured by ldap_detect_rfc2307bis() based on schema detection
 if (getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE')) {
   $LDAP['group_membership_attribute'] = getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE');
 }
+
+// Admin can explicitly override whether membership uses UID or DN
+// If not set, it will be auto-configured by ldap_detect_rfc2307bis() based on membership attribute
 if (getenv('LDAP_GROUP_MEMBERSHIP_USES_UID')) {
   if (strtoupper(getenv('LDAP_GROUP_MEMBERSHIP_USES_UID')) == 'TRUE') { $LDAP['group_membership_uses_uid'] = TRUE; }
   if (strtoupper(getenv('LDAP_GROUP_MEMBERSHIP_USES_UID')) == 'FALSE') { $LDAP['group_membership_uses_uid'] = FALSE; }
@@ -1382,6 +1398,7 @@ $REMOTE_HTTP_HEADERS_LOGIN = ((strcasecmp(getenv('REMOTE_HTTP_HEADERS_LOGIN'),'T
 $LDAP_DEBUG = ((strcasecmp(getenv('LDAP_DEBUG'),'TRUE') == 0) ? TRUE : get_config_default('LDAP_DEBUG'));
 $LDAP_VERBOSE_CONNECTION_LOGS = ((strcasecmp(getenv('LDAP_VERBOSE_CONNECTION_LOGS'),'TRUE') == 0) ? TRUE : get_config_default('LDAP_VERBOSE_CONNECTION_LOGS'));
 $SESSION_DEBUG = ((strcasecmp(getenv('SESSION_DEBUG'),'TRUE') == 0) ? TRUE : get_config_default('SESSION_DEBUG'));
+$SHOW_ERROR_DETAILS = ((strcasecmp(getenv('SHOW_ERROR_DETAILS'),'TRUE') == 0) ? TRUE : get_config_default('SHOW_ERROR_DETAILS'));
 
 $SMTP['debug_level'] = getenv('SMTP_LOG_LEVEL');
 if (!is_numeric($SMTP['debug_level']) or $SMTP['debug_level'] > 4 or $SMTP['debug_level'] < 0) {

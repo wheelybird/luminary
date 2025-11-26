@@ -118,83 +118,91 @@ if (isset($_POST['change_password'])) {
 
 render_header("Change your $ORGANISATION_NAME password");
 
+?>
+<div class="container">
+<?php
+
 if (isset($not_strong_enough)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">The password wasn't strong enough.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">The password wasn't strong enough.</p>
+ </div>
 <?php }
 
 if (isset($invalid_chars)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">The password contained invalid characters.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">The password contained invalid characters.</p>
+ </div>
 <?php }
 
 if (isset($mismatched)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">The passwords didn't match.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">The passwords didn't match.</p>
+ </div>
 <?php }
 
 if (isset($missing_current_password)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">Current password is required.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">Current password is required.</p>
+ </div>
 <?php }
 
 if (isset($invalid_current_password)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">Invalid current password.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">Invalid current password.</p>
+ </div>
 <?php }
 
 if (isset($password_in_history)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">Password was used recently and cannot be reused.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">Password was used recently and cannot be reused.</p>
+ </div>
 <?php }
 
 if (isset($ppolicy_error)) {  ?>
-<div class="alert alert-warning">
- <p class="text-center">
- <?php
- if ($ppolicy_error == "SYSTEM_ERROR") {
-   echo "The password could not be changed due to a system configuration issue. Please contact your administrator.";
- } else {
-   echo "Password policy error: " . htmlspecialchars($ppolicy_error);
- }
- ?>
- </p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center">
+  <?php
+  if ($ppolicy_error == "SYSTEM_ERROR") {
+    echo "The password could not be changed due to a system configuration issue. Please contact your administrator.";
+  } else {
+    echo "Password policy error: " . htmlspecialchars($ppolicy_error);
+  }
+  ?>
+  </p>
+ </div>
 <?php }
 
 // Display password expired alert
 if ($password_expired_forced) {  ?>
-<div class="alert alert-danger">
- <p class="text-center"><strong>Your password has expired.</strong><br>
- You must change your password to continue using your account.</p>
-</div>
+ <div class="alert alert-danger">
+  <p class="text-center"><strong>Your password has expired.</strong><br>
+  You must change your password to continue using your account.</p>
+ </div>
 <?php }
 // Display password expiry warning (if not already expired)
 elseif ($password_expires_in_days !== null && $password_expires_in_days > 0 && $password_expires_in_days <= $PASSWORD_EXPIRY_WARNING_DAYS) { ?>
-<div class="alert alert-warning">
- <p class="text-center"><strong>Your password expires in <?php echo $password_expires_in_days; ?> day<?php echo $password_expires_in_days != 1 ? 's' : ''; ?>.</strong><br>
- Please change it now to avoid being locked out of your account.</p>
-</div>
+ <div class="alert alert-warning">
+  <p class="text-center"><strong>Your password expires in <?php echo $password_expires_in_days; ?> day<?php echo $password_expires_in_days != 1 ? 's' : ''; ?>.</strong><br>
+  Please change it now to avoid being locked out of your account.</p>
+ </div>
 <?php }
 
 // Display password age information if available
 if ($password_age_days !== null) { ?>
-<div class="alert alert-info">
- <p class="text-center">
- <strong>Password Information:</strong><br>
- Last changed: <?php echo $password_changed_formatted; ?> (<?php echo $password_age_days; ?> day<?php echo $password_age_days != 1 ? 's' : ''; ?> ago)
- <?php if ($password_expires_in_days !== null && $password_expires_in_days > 0) { ?>
- <br>Expires: <?php echo date('F j, Y', strtotime($password_changed_time) + ($PASSWORD_EXPIRY_DAYS * 86400)); ?>
- <?php } ?>
- </p>
-</div>
+ <div class="alert alert-info">
+  <p class="text-center">
+  <strong>Password Information:</strong><br>
+  Last changed: <?php echo $password_changed_formatted; ?> (<?php echo $password_age_days; ?> day<?php echo $password_age_days != 1 ? 's' : ''; ?> ago)
+  <?php if ($password_expires_in_days !== null && $password_expires_in_days > 0) { ?>
+  <br>Expires: <?php echo date('F j, Y', strtotime($password_changed_time) + ($PASSWORD_EXPIRY_DAYS * 86400)); ?>
+  <?php } ?>
+  </p>
+ </div>
 <?php }
+
+?>
+</div>
+<?php
 
 ?>
 

@@ -13,9 +13,11 @@ if (isset($_GET["redirect_to"])) { $redirect_to = $_GET["redirect_to"]; }
 
 if (isset($_GET['logged_out'])) {
 ?>
-<div class="alert alert-warning">
-<p class="text-center">You've been automatically logged out because you've been inactive for over
-<?php print $SESSION_TIMEOUT; ?> minutes. Click on the 'Log in' link to get back into the system.</p>
+<div class="container">
+ <div class="alert alert-warning">
+  <p class="text-center">You've been automatically logged out because you've been inactive for over
+  <?php print $SESSION_TIMEOUT; ?> minutes. Click on the 'Log in' link to get back into the system.</p>
+ </div>
 </div>
 <?php
 }
