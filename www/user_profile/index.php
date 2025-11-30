@@ -271,7 +271,7 @@ if (isset($user[0]['cn'][0])) {
               <button type="submit" name="update_profile" class="btn btn-primary">
                 <i class="bi bi-save"></i> Update Profile
               </button>
-              <a href="/" class="btn btn-secondary">
+              <a href="<?php echo url('/'); ?>" class="btn btn-secondary">
                 <i class="bi bi-x-circle"></i> Cancel
               </a>
             </div>
@@ -353,7 +353,7 @@ if (isset($user[0]['cn'][0])) {
       </div>
       <div class="row">
         <div class="col-sm-12">
-          <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">
+          <a href="<?php echo url('/change_password'); ?>" class="btn btn-primary">
             <i class="bi bi-key"></i> Change password
           </a>
         </div>

@@ -373,7 +373,7 @@ Set up alerts for:
 ### 4. Secure Log Storage
 
 - Store logs on separate partition/volume
-- Use centralized logging (syslog, SIEM)
+- Use centralised logging (syslog, SIEM)
 - Implement log immutability (WORM storage)
 - Encrypt logs at rest and in transit
 

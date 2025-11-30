@@ -158,7 +158,7 @@ render_header("$ORGANISATION_NAME account manager - Verify MFA");
 
     <div class="row">
      <div class="col-sm-12 text-center">
-      <a href="/<?php echo $SERVER_PATH; ?>log_in" class="btn btn-link">Cancel and log out</a>
+      <a href="<?php echo url('/log_in'); ?>" class="btn btn-link">Cancel and log out</a>
      </div>
     </div>
 

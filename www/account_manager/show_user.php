@@ -193,10 +193,10 @@ include __DIR__ . '/includes/handlers/user_groups_handler.php';
 
 
 ?>
-<script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
+<script src="<?php print url('/js/password-utils.js'); ?>"></script>
 <script>
 
- // Initialize password requirements checker or strength meter
+ // Initialise password requirements checker or strength meter
  document.addEventListener('DOMContentLoaded', function() {
    <?php if ($PASSWORD_POLICY_ENABLED) { ?>
    window.passwordRequirements = {

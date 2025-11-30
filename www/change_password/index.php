@@ -94,6 +94,47 @@ if (isset($_POST['change_password'])) {
   }
 
   if ($password_changed) {
+    // Send password reset email notification
+    if ($EMAIL_SENDING_ENABLED) {
+      $ldap_connection = open_ldap_connection();
+
+      // Get user details for email
+      $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+        "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+        array('mail', 'givenname', 'sn'));
+
+      if ($user_search) {
+        $user_entry = ldap_get_entries($ldap_connection, $user_search);
+        if ($user_entry['count'] > 0 && isset($user_entry[0]['mail'][0])) {
+          include_once "mail_functions.inc.php";
+
+          $user_mail = $user_entry[0]['mail'][0];
+          $user_givenname = isset($user_entry[0]['givenname'][0]) ? $user_entry[0]['givenname'][0] : '';
+          $user_sn = isset($user_entry[0]['sn'][0]) ? $user_entry[0]['sn'][0] : '';
+          $full_name = trim($user_givenname . " " . $user_sn);
+
+          $reset_mail_body = parse_mail_text(
+            $reset_password_mail_body,
+            '', // No password in reset email
+            $USER_ID,
+            $user_givenname,
+            $user_sn
+          );
+          $reset_mail_subject = parse_mail_text(
+            $reset_password_mail_subject,
+            '',
+            $USER_ID,
+            $user_givenname,
+            $user_sn
+          );
+
+          send_email($user_mail, $full_name, $reset_mail_subject, $reset_mail_body);
+        }
+      }
+
+      ldap_close($ldap_connection);
+    }
+
     render_header("$ORGANISATION_NAME account manager - password changed");
   ?>
   <div class="container">
@@ -206,7 +247,7 @@ if ($password_age_days !== null) { ?>
 
 ?>
 
-<script src="<?php print $SERVER_PATH; ?>js/password-utils.js"></script>
+<script src="<?php print url('/js/password-utils.js'); ?>"></script>
 
 <div class="container">
  <div class="row justify-content-center">
@@ -282,7 +323,7 @@ if ($password_age_days !== null) { ?>
     </div>
 
     <script>
-      // Initialize password requirements checker
+      // Initialise password requirements checker
       document.addEventListener('DOMContentLoaded', function() {
         window.passwordRequirements = {
           minLength: <?php echo (int)$PASSWORD_MIN_LENGTH; ?>,

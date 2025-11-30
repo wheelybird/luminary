@@ -231,11 +231,34 @@ Add custom objectClasses and attributes to user accounts and groups.
 
 ### Adding Custom Attributes
 
-Attributes are defined in JSON format with field types:
+Attributes can be defined in two formats: JSON format (recommended) or colon-separated format.
+
+**JSON Format** (recommended for complex configurations):
 
 ```bash
 -e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES='{"mailQuota":"text","homeDirectory":"text","loginShell":"shell"}'
 ```
+
+**Colon-Separated Format** (simpler for basic attributes):
+
+```bash
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="attribute:label:default:type"
+```
+
+Format: `attributeName:Label:DefaultValue:InputType`
+
+Examples:
+```bash
+# Single attribute
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="mailEnabled:Mail enabled:FALSE:checkbox"
+
+# Multiple attributes (comma-separated)
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="mailEnabled:Mail enabled:FALSE:checkbox,mailQuota:Mail quota:100MB:text,homePhone:Home phone::tel"
+```
+
+Special suffixes for colon-separated format:
+- `+` suffix = multi-value attribute (e.g., `phoneNumber+:Phone numbers`)
+- `^` suffix = binary attribute (e.g., `jpegPhoto^:Profile photo`)
 
 ### Available Field Types
 

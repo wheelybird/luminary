@@ -132,7 +132,7 @@ Luminary supports two methods for determining which users require MFA to log int
 
 Store MFA requirements directly in LDAP group objects. This provides:
 - **Per-group grace periods**: Each group can have its own grace period
-- **Centralized management**: MFA policies stored alongside group data
+- **Centralised management**: MFA policies stored alongside group data
 - **UI management**: Admins can configure via the Luminary web interface
 - **Better auditing**: Changes tracked in LDAP modify logs
 
@@ -389,7 +389,7 @@ ldapsearch -x -H ldap://localhost -D "cn=admin,dc=example,dc=com" -w password \
 
 **Symptom**: User has enrolled but status shows "Pending"
 
-**Cause**: Grace period tracking may not have been initialized
+**Cause**: Grace period tracking may not have been initialised
 
 **Solution**: Admin can regenerate backup codes to reset the status, or user can disable and re-enable MFA.
 

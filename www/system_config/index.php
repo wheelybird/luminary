@@ -335,16 +335,6 @@ function display_config_item($key, $metadata) {
     }
   }
 
-  // Get loaded PHP extensions
-  $important_extensions = array(
-    'ldap' => 'LDAP',
-    'mbstring' => 'Multibyte String',
-    'openssl' => 'OpenSSL',
-    'session' => 'Session',
-    'json' => 'JSON',
-    'gd' => 'GD (Image)',
-    'curl' => 'cURL'
-  );
   ?>
 
   <div class="row">
@@ -359,41 +349,6 @@ function display_config_item($key, $metadata) {
             <tr>
               <th style="width: 40%;">Luminary Version</th>
               <td><span class="badge bg-primary"><?php echo htmlspecialchars($luminary_version); ?></span></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- PHP Information -->
-    <div class="col-md-6 mb-3">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="card-title mb-0"><i class="bi bi-code-square"></i> PHP runtime</h5>
-        </div>
-        <div class="card-body">
-          <table class="table table-sm mb-0">
-            <tr>
-              <th style="width: 40%;">PHP Version</th>
-              <td><span class="badge bg-info"><?php echo phpversion(); ?></span></td>
-            </tr>
-            <tr>
-              <th>Memory Limit</th>
-              <td><?php echo ini_get('memory_limit'); ?></td>
-            </tr>
-            <tr>
-              <th>Max Execution Time</th>
-              <td><?php echo ini_get('max_execution_time'); ?>s</td>
-            </tr>
-            <tr>
-              <th>Max Upload Size</th>
-              <td><?php echo ini_get('upload_max_filesize'); ?></td>
-            </tr>
-            <tr>
-              <th>Display Errors</th>
-              <td><span class="badge <?php echo ini_get('display_errors') ? 'bg-warning' : 'bg-success'; ?>">
-                <?php echo ini_get('display_errors') ? 'On' : 'Off'; ?>
-              </span></td>
             </tr>
           </table>
         </div>
@@ -469,43 +424,6 @@ function display_config_item($key, $metadata) {
               <td><i class="<?php echo $tls_icon; ?>"></i> <span class="badge <?php echo $tls_status_class; ?>"><?php echo htmlspecialchars($tls_status); ?></span></td>
             </tr>
           </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- PHP Extensions -->
-    <div class="col-md-12 mb-3">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="card-title mb-0"><i class="bi bi-puzzle"></i> PHP extensions</h5>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <?php foreach ($important_extensions as $ext => $display_name) {
-              $loaded = extension_loaded($ext);
-              $badge_class = $loaded ? 'bg-success' : 'bg-secondary';
-              $icon = $loaded ? 'check-circle' : 'x-circle';
-              echo '<div class="col-md-3 mb-2">';
-              echo '<i class="bi bi-' . $icon . '"></i> ';
-              echo '<span class="badge ' . $badge_class . '">' . htmlspecialchars($display_name) . '</span>';
-              echo '</div>';
-            } ?>
-          </div>
-          <div class="mt-3">
-            <small class="text-muted">
-              Total loaded extensions: <?php echo count(get_loaded_extensions()); ?>
-              <a href="#" onclick="document.getElementById('allExtensions').style.display='block'; this.style.display='none'; return false;" class="ms-2">Show all</a>
-            </small>
-            <div id="allExtensions" style="display: none;" class="mt-2">
-              <?php
-              $all_extensions = get_loaded_extensions();
-              sort($all_extensions);
-              foreach ($all_extensions as $ext) {
-                echo '<span class="badge bg-secondary me-1">' . htmlspecialchars($ext) . '</span> ';
-              }
-              ?>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -643,7 +561,7 @@ document.getElementById('collapseAll').addEventListener('click', function() {
   });
 });
 
-// Initialize - expand all categories by default
+// Initialise - expand all categories by default
 document.addEventListener('DOMContentLoaded', function() {
   // All categories are expanded by default, no action needed
   // Just ensure collapse indicators are set correctly

@@ -129,7 +129,7 @@ function show_generic_error_page($error_details = '') {
               <?php endif; ?>
 
               <p class="text-center mt-4">
-                <a href="/" class="btn btn-primary">Return to Home</a>
+                <a href="<?php echo url('/'); ?>" class="btn btn-primary">Return to Home</a>
               </p>
             </div>
           </div>
@@ -196,6 +196,33 @@ function generate_passkey() {
  $rnd2 = mt_rand(10000000, mt_getrandmax());
  $rnd3 = mt_rand(10000000, mt_getrandmax());
  return sprintf("%0x",$rnd1) . sprintf("%0x",$rnd2) . sprintf("%0x",$rnd3);
+
+}
+
+
+######################################################
+
+/**
+ * Generate URL with SERVER_PATH prefix
+ *
+ * @param string $path  URL path (with or without leading slash)
+ * @return string       Full URL with SERVER_PATH prefix
+ */
+function url($path) {
+
+  global $SERVER_PATH;
+
+  // Ensure path starts with /
+  if ($path[0] !== '/') {
+    $path = '/' . $path;
+  }
+
+  // Remove SERVER_PATH if already present (avoid double-prefix)
+  if (!empty($SERVER_PATH) && strpos($path, $SERVER_PATH) === 0) {
+    $path = substr($path, strlen($SERVER_PATH));
+  }
+
+  return $SERVER_PATH . $path;
 
 }
 
@@ -410,10 +437,10 @@ function render_header($title="",$menu=TRUE) {
  <TITLE><?php print "$title"; ?></TITLE>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, initial-scale=1">
- <link rel="stylesheet" href="<?php print $SERVER_PATH; ?>bootstrap/css/bootstrap.min.css">
+ <link rel="stylesheet" href="<?php print url('/bootstrap/css/bootstrap.min.css'); ?>">
  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
  <?php if ($CUSTOM_STYLES) echo '<link rel="stylesheet" href="'.$CUSTOM_STYLES.'">' ?>
- <script src="<?php print $SERVER_PATH; ?>bootstrap/js/bootstrap.bundle.min.js"></script>
+ <script src="<?php print url('/bootstrap/js/bootstrap.bundle.min.js'); ?>"></script>
 </HEAD>
 <BODY>
 <?php
@@ -483,10 +510,10 @@ function render_menu() {
         #print "<p>$module - access is $access & show is $show_this_module</p>";
         if ($show_this_module == TRUE ) {
          if ($module == $THIS_MODULE) {
-          print "<li class='nav-item'><a class='nav-link active' href='{$SERVER_PATH}{$module}/'>$this_module_name</a></li>\n";
+          print "<li class='nav-item'><a class='nav-link active' href='" . url("/{$module}/") . "'>$this_module_name</a></li>\n";
          }
          else {
-          print "<li class='nav-item'><a class='nav-link' href='{$SERVER_PATH}{$module}/'>$this_module_name</a></li>\n";
+          print "<li class='nav-item'><a class='nav-link' href='" . url("/{$module}/") . "'>$this_module_name</a></li>\n";
          }
         }
        }
@@ -911,7 +938,7 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
     last_name_clean = last_name_clean.replace(new RegExp(char, 'g'), replacements[char]);
   }
 
-  // Then normalize to NFD and remove combining diacritical marks
+  // Then normalise to NFD and remove combining diacritical marks
   first_name_clean = first_name_clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   last_name_clean = last_name_clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -1103,17 +1130,28 @@ function render_dynamic_field_js() {
 
 function render_attribute_fields($attribute,$label,$values_r,$resource_identifier,$onkeyup="",$inputtype="",$tabindex=null) {
 
-  global $THIS_MODULE_PATH;
+  global $THIS_MODULE_PATH, $LDAP;
+
+  // Check if this is the account identifier field
+  $is_account_identifier = ($attribute == $LDAP['account_attribute']);
+
+  // Add special styling for account identifier
+  $field_class = 'form-control';
+  $label_class = 'col-sm-3 col-form-label text-end';
+  if ($is_account_identifier) {
+    $field_class .= ' bg-light border-primary';
+    $label_class .= ' fw-bold';
+  }
 
   ?>
 
      <div class="row mb-3" id="<?php print $attribute; ?>_div">
 
-       <label for="<?php print $attribute; ?>" class="col-sm-3 col-form-label text-end"><?php print $label; ?></label>
+       <label for="<?php print $attribute; ?>" class="<?php print $label_class; ?>"><?php if ($is_account_identifier) { ?><i class="bi bi-key-fill text-primary"></i> <?php } ?><?php print $label; ?></label>
        <div class="col-sm-6" id="<?php print $attribute; ?>_input_div">
        <?php if($inputtype == "multipleinput") {
              ?><div class="input-group">
-                  <input type="text" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>[]" value="<?php if (isset($values_r[0])) { print htmlspecialchars(decode_ldap_value($values_r[0]), ENT_QUOTES, 'UTF-8'); } ?>">
+                  <input type="text" class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>[]" value="<?php if (isset($values_r[0])) { print htmlspecialchars(decode_ldap_value($values_r[0]), ENT_QUOTES, 'UTF-8'); } ?>">
                   <button type="button" class="btn btn-secondary" onclick="add_field_to('<?php print $attribute; ?>')">+</button>
               </div>
             <?php
@@ -1161,19 +1199,19 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
             <?php
             }
             elseif ($inputtype == "textarea") { ?>
-              <textarea <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" rows="4" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>><?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?></textarea>
+              <textarea <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" rows="4" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>><?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?></textarea>
             <?php
             }
             elseif ($inputtype == "tel") { ?>
-              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="tel" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="tel" class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
             <?php
             }
             elseif ($inputtype == "email") { ?>
-              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="email" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="email" class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
             <?php
             }
             elseif ($inputtype == "url") { ?>
-              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="url" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" placeholder="https://" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="url" class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print htmlspecialchars($values_r[0], ENT_QUOTES, 'UTF-8'); } ?>" placeholder="https://" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
             <?php
             }
             elseif ($inputtype == "checkbox") {
@@ -1189,7 +1227,7 @@ function render_attribute_fields($attribute,$label,$values_r,$resource_identifie
             <?php
             }
             else { ?>
-              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="text" class="form-control" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print $values_r[0]; } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
+              <input <?php if (isset($tabindex)) { ?>tabindex="<?php print $tabindex; ?>" <?php } ?>type="text" class="<?php print $field_class; ?>" id="<?php print $attribute; ?>" name="<?php print $attribute; ?>" value="<?php if (isset($values_r[0])) { print $values_r[0]; } ?>" <?php if ($onkeyup != "") { print "onkeyup=\"$onkeyup\""; } ?>>
             <?php
             }
             ?>

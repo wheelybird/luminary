@@ -184,7 +184,7 @@ render_header("Manage Multi-Factor Authentication");
           </div>
 
           <p class="text-center">
-            <a href="<?php echo $SERVER_PATH; ?>home" class="btn btn-primary">Return to Home</a>
+            <a href="<?php echo url('/home'); ?>" class="btn btn-primary">Return to Home</a>
           </p>
         </div>
       </div>
@@ -197,7 +197,7 @@ render_header("Manage Multi-Factor Authentication");
         <div class="card-body">
           <p>Your multi-factor authentication has been disabled.</p>
           <p class="text-center">
-            <a href="<?php echo $SERVER_PATH; ?>home" class="btn btn-primary">Return to Home</a>
+            <a href="<?php echo url('/home'); ?>" class="btn btn-primary">Return to Home</a>
           </p>
         </div>
       </div>
@@ -299,7 +299,7 @@ render_header("Manage Multi-Factor Authentication");
 
               <p class="text-center"><small>Or manually enter this secret: <code><?php echo htmlspecialchars($new_secret); ?></code></small></p>
 
-              <script src="<?php echo $SERVER_PATH; ?>js/qrcode.min.js"></script>
+              <script src="<?php echo url('/js/qrcode.min.js'); ?>"></script>
               <script>
                 new QRCode(document.getElementById("qrcode"), {
                   text: "<?php echo htmlspecialchars($qr_image_url, ENT_QUOTES); ?>",

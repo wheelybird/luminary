@@ -58,7 +58,7 @@ render_header("$ORGANISATION_NAME account manager");
       Your password expires in <strong><?php echo $days_remaining; ?> day<?php echo $days_remaining != 1 ? 's' : ''; ?></strong>.
       Please change it now to avoid being locked out of your account.
     </p>
-    <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-warning">Change password now</a>
+    <a href="<?php echo url('/change_password'); ?>" class="btn btn-warning">Change password now</a>
   </div>
   <?php endif; ?>
 
@@ -96,7 +96,7 @@ render_header("$ORGANISATION_NAME account manager");
         </div>
         <div class="card-body">
           <p>Update your account password.</p>
-          <a href="<?php echo $SERVER_PATH; ?>change_password" class="btn btn-primary">Change password</a>
+          <a href="<?php echo url('/change_password'); ?>" class="btn btn-primary">Change password</a>
         </div>
       </div>
     </div>
@@ -119,7 +119,7 @@ render_header("$ORGANISATION_NAME account manager");
           <?php else: ?>
             <p>Set up or manage multi-factor authentication (MFA) for your account.</p>
           <?php endif; ?>
-          <a href="<?php echo $SERVER_PATH; ?>manage_mfa" class="btn btn-<?php echo $mfa_status['needs_setup'] ? 'warning' : 'primary'; ?>">Manage MFA</a>
+          <a href="<?php echo url('/manage_mfa'); ?>" class="btn btn-<?php echo $mfa_status['needs_setup'] ? 'warning' : 'primary'; ?>">Manage MFA</a>
         </div>
       </div>
     </div>
@@ -133,7 +133,7 @@ render_header("$ORGANISATION_NAME account manager");
         </div>
         <div class="card-body">
           <p>Manage user accounts, groups, and system settings.</p>
-          <a href="<?php echo $SERVER_PATH; ?>account_manager" class="btn btn-success">Account manager</a>
+          <a href="<?php echo url('/account_manager'); ?>" class="btn btn-success">Account manager</a>
         </div>
       </div>
     </div>
@@ -147,7 +147,7 @@ render_header("$ORGANISATION_NAME account manager");
         </div>
         <div class="card-body">
           <p>View complete system configuration and settings.</p>
-          <a href="<?php echo $SERVER_PATH; ?>system_config" class="btn btn-info">System config</a>
+          <a href="<?php echo url('/system_config'); ?>" class="btn btn-info">System config</a>
         </div>
       </div>
     </div>

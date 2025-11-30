@@ -649,6 +649,18 @@ $CONFIG_REGISTRY = array(
     'variable' => '$EMAIL[\'from_name\']'
   ),
 
+  'EMAIL_REPLY_TO_ADDRESS' => array(
+    'category' => 'email',
+    'description' => 'Reply-to email address',
+    'help' => 'Email address for reply-to header (optional)',
+    'type' => 'string',
+    'default' => null,
+    'mandatory' => false,
+    'env_var' => 'EMAIL_REPLY_TO_ADDRESS',
+    'variable' => '$EMAIL[\'reply_to_address\']',
+    'display_code' => true
+  ),
+
   'ACCOUNT_REQUESTS_ENABLED' => array(
     'category' => 'email',
     'description' => 'Enable account request feature',
@@ -1243,11 +1255,9 @@ $min_gid = 2000;
 
 // Adjust attribute map based on SHOW_POSIX_ATTRIBUTES
 if ($SHOW_POSIX_ATTRIBUTES != TRUE) {
-  if ($LDAP['account_attribute'] == "uid") {
-    unset($LDAP['default_attribute_map']['cn']);
-  } else {
-    unset($LDAP['default_attribute_map']['uid']);
-  }
+  // Always keep both uid and cn fields visible
+  // Users can hide specific fields via LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES if not needed
+  // Fixes #219 - allow both email and UID fields to be shown
 } else {
   $LDAP['default_attribute_map']["uidnumber"] = array("label" => "UID");
   $LDAP['default_attribute_map']["gidnumber"] = array("label" => "GID");
@@ -1359,6 +1369,7 @@ $SMTP['helo'] = getenv('SMTP_HELO_HOST');
 
 $EMAIL['from_address'] = (getenv('EMAIL_FROM_ADDRESS') ? getenv('EMAIL_FROM_ADDRESS') : get_config_default('EMAIL_FROM_ADDRESS'));
 $EMAIL['from_name'] = (getenv('EMAIL_FROM_NAME') ? getenv('EMAIL_FROM_NAME') : get_config_default('EMAIL_FROM_NAME'));
+$EMAIL['reply_to_address'] = (getenv('EMAIL_REPLY_TO_ADDRESS') ? getenv('EMAIL_REPLY_TO_ADDRESS') : get_config_default('EMAIL_REPLY_TO_ADDRESS'));
 $EMAIL_DOMAIN = getenv('EMAIL_DOMAIN');
 
 $EMAIL_SENDING_ENABLED = (!empty($SMTP['host']));

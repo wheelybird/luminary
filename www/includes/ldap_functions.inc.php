@@ -817,17 +817,49 @@ function ldap_get_group_name_from_gid($ldap_connection,$gid) {
 
 ##################################
 
+/**
+ * Split string by delimiter, respecting backslash escapes
+ *
+ * @param string $str        String to split
+ * @param string $delimiter  Delimiter character
+ * @return array            Split parts with escapes removed
+ */
+function split_escaped($str, $delimiter) {
+  $parts = array();
+  $current = '';
+  $escaped = false;
+
+  for ($i = 0; $i < strlen($str); $i++) {
+    $char = $str[$i];
+
+    if ($escaped) {
+      $current .= $char;
+      $escaped = false;
+    } elseif ($char === '\\') {
+      $escaped = true;
+    } elseif ($char === $delimiter) {
+      $parts[] = $current;
+      $current = '';
+    } else {
+      $current .= $char;
+    }
+  }
+
+  $parts[] = $current;
+  return $parts;
+}
+
 function ldap_complete_attribute_array($default_attributes,$additional_attributes) {
 
   if (isset($additional_attributes)) {
 
-    $user_attribute_r = explode(",", $additional_attributes);
+    $user_attribute_r = split_escaped($additional_attributes, ',');
     $to_merge = array();
 
     foreach ($user_attribute_r as $this_attr) {
 
       $this_r = array();
-      $kv = explode(":", $this_attr);
+      $kv = split_escaped($this_attr, ':');
       $attr_name = strtolower(trim($kv[0]));
       $this_r['inputtype'] = "singleinput";
 

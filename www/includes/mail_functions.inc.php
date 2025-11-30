@@ -70,6 +70,9 @@ function send_email($recipient_email,$recipient_name,$subject,$body) {
 
   $mail->SMTPAutoTLS = false;
   $mail->setFrom($EMAIL['from_address'], $EMAIL['from_name']);
+  if (!empty($EMAIL['reply_to_address'])) {
+    $mail->addReplyTo($EMAIL['reply_to_address'], $EMAIL['from_name']);
+  }
   $mail->addAddress($recipient_email, $recipient_name);
   $mail->Subject = $subject;
   $mail->Body = $body;

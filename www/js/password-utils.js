@@ -80,7 +80,7 @@ function generatePassword(wordCount, separator, passwordFieldId, confirmFieldId)
     const randomIndex = Math.floor(Math.random() * WORD_LIST.length);
     const word = WORD_LIST[randomIndex];
 
-    // Capitalize first letter if uppercase required, otherwise lowercase
+    // Capitalise first letter if uppercase required, otherwise lowercase
     if (requirements.requireUppercase) {
       words.push(word.charAt(0).toUpperCase() + word.slice(1));
     } else {
@@ -165,7 +165,7 @@ function calculatePasswordStrength(password) {
   if (/[0-9]/.test(password)) score++; // numbers
   if (/[^a-zA-Z0-9]/.test(password)) score++; // special chars
 
-  // Penalize common patterns
+  // Penalise common patterns
   if (/^[a-z]+$/.test(password) || /^[A-Z]+$/.test(password) || /^[0-9]+$/.test(password)) {
     score = Math.max(0, score - 2);
   }
@@ -175,7 +175,7 @@ function calculatePasswordStrength(password) {
     score = Math.max(0, score - 1);
   }
 
-  // Normalize to 0-4 scale
+  // Normalise to 0-4 scale
   if (score >= 7) return 4;
   if (score >= 5) return 3;
   if (score >= 3) return 2;
@@ -315,7 +315,7 @@ function updatePasswordStrength(password) {
 }
 
 /**
- * Initialize password strength meter on an input field
+ * Initialise password strength meter on an input field
  * @param {string} passwordInputId - ID of password input field
  */
 function initPasswordStrength(passwordInputId) {
@@ -332,7 +332,7 @@ function initPasswordStrength(passwordInputId) {
 }
 
 /**
- * Initialize password requirements checker on an input field
+ * Initialise password requirements checker on an input field
  * @param {string} passwordInputId - ID of password input field
  * @param {Object} requirements - Password policy requirements object
  */

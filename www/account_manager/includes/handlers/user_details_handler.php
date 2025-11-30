@@ -146,6 +146,33 @@ if (isset($_POST['update_account'])) {
       password_policy_add_to_history($ldap_connection, $dn, $new_password_hash);
     }
 
+    // Send password reset email notification if password was changed
+    if (isset($password_was_changed) && $password_was_changed && isset($mail[0]) && !empty($mail[0]) && $can_send_email == TRUE) {
+      include_once "mail_functions.inc.php";
+
+      // Handle mononym users for email (fixes #213, #171)
+      $givenname_for_mail = isset($givenname[0]) ? $givenname[0] : '';
+      $sn_for_mail = isset($sn[0]) ? $sn[0] : '';
+
+      $reset_mail_body = parse_mail_text(
+        $reset_password_mail_body,
+        '', // No password in reset email
+        $account_identifier,
+        $givenname_for_mail,
+        $sn_for_mail
+      );
+      $reset_mail_subject = parse_mail_text(
+        $reset_password_mail_subject,
+        '',
+        $account_identifier,
+        $givenname_for_mail,
+        $sn_for_mail
+      );
+
+      $full_name = trim($givenname_for_mail . " " . $sn_for_mail);
+      send_email($mail[0], $full_name, $reset_mail_subject, $reset_mail_body);
+    }
+
     // Audit log user update
     $update_fields = array_keys($to_update);
     $update_details = "Updated fields: " . implode(', ', $update_fields);

@@ -86,7 +86,7 @@ render_header("$ORGANISATION_NAME account manager - Account expired");
           <?php endif; ?>
 
           <div class="text-center mt-4">
-            <a href="<?php echo $SERVER_PATH; ?>log_out" class="btn btn-secondary">
+            <a href="<?php echo url('/log_out'); ?>" class="btn btn-secondary">
               <i class="bi bi-box-arrow-right"></i> Log Out
             </a>
           </div>
