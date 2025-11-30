@@ -439,6 +439,7 @@ function render_header($title="",$menu=TRUE) {
  <meta name="viewport" content="width=device-width, initial-scale=1">
  <link rel="stylesheet" href="<?php print url('/bootstrap/css/bootstrap.min.css'); ?>">
  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+ <link rel="stylesheet" href="<?php print url('/custom.css'); ?>">
  <?php if ($CUSTOM_STYLES) echo '<link rel="stylesheet" href="'.$CUSTOM_STYLES.'">' ?>
  <script src="<?php print url('/bootstrap/js/bootstrap.bundle.min.js'); ?>"></script>
 </HEAD>

@@ -466,6 +466,7 @@ SMTP configuration and email notifications
 | SMTP HELO hostname<br><small>Hostname to use in HELO/EHLO command</small> | string | *Not set* | `SMTP_HELO_HOST` | SMTP HELO hostname |
 | From email address<br><small>Email address for outgoing messages</small> | string | 📝 `admin@luminary.id` | `EMAIL_FROM_ADDRESS` | From email address |
 | From name for emails<br><small>Display name for outgoing messages</small> | string | 📝 `Luminary` | `EMAIL_FROM_NAME` | From name for emails |
+| Reply-to email address<br><small>Email address for reply-to header (optional)</small> | string | *Not set* | `EMAIL_REPLY_TO_ADDRESS` | Reply-to email address |
 | Enable account request feature<br><small>Requires SMTP to be configured</small> | ✅ boolean | `FALSE` | `ACCOUNT_REQUESTS_ENABLED` | Enable account request feature |
 | Email for account requests<br><small>Where account request notifications are sent</small> | string | 📝 `admin@luminary.id` | `ACCOUNT_REQUESTS_EMAIL` | Email for account requests |
 
@@ -550,6 +551,14 @@ Display name for outgoing messages
 **Environment Variable:** `EMAIL_FROM_NAME`
 
 **Default:** `Luminary`
+
+---
+
+#### Reply-to email address
+
+Email address for reply-to header (optional)
+
+**Environment Variable:** `EMAIL_REPLY_TO_ADDRESS`
 
 ---
 
@@ -1142,4 +1151,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2025-11-26 18:31:45 UTC*
+*Last updated: 2025-11-30 18:25:39 UTC*

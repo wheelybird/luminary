@@ -1,0 +1,12 @@
+/* Custom styles for Luminary */
+
+/* Active menu item background - restores Bootstrap 3-style visible active state */
+.navbar-nav .nav-link.active {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+  border-radius: 0.25rem;
+}
+
+/* Active menu item on hover */
+.navbar-nav .nav-link.active:hover {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+}
