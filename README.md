@@ -1,6 +1,7 @@
 # Luminary
 
-> **Note:** This project was previously known as **ldap-user-manager**.  The next release will fully transition to the name **Luminary**.
+
+> **Note:** This project was previously known as **ldap-user-manager**. If you're looking for the ldap-user-manager project, you're in the right place - it's now called Luminary!
 
 Luminary is a PHP LDAP account manager; a web-based GUI interface which allows you to quickly populate a new LDAP directory and easily manage user accounts and groups.  It also has a self-service password change module.   
 It's designed to work with OpenLDAP and to be run as a container.  It complements OpenLDAP containers such as [*osixia/openldap*](https://hub.docker.com/r/osixia/openldap/).
