@@ -1151,4 +1151,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2025-11-30 18:25:39 UTC*
+*Last updated: 2025-12-03 14:50:50 UTC*

@@ -260,6 +260,28 @@ Special suffixes for colon-separated format:
 - `+` suffix = multi-value attribute (e.g., `phoneNumber+:Phone numbers`)
 - `^` suffix = binary attribute (e.g., `jpegPhoto^:Profile photo`)
 
+**Escape sequences in colon-separated format:**
+
+Use tilde (`~`) to include literal colons or commas in labels or default values:
+- `~:` = literal colon
+- `~,` = literal comma
+- `~~` = literal tilde
+
+Examples:
+```bash
+# Label with colon
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="employeeType:Employee Type~: Full-time/Part-time::text"
+
+# Default value with comma
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="address:Address:123 Main St~, Apt 5::text"
+
+# Label with both colons and commas
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="title:Job Title~: e.g.~, Manager~, Director::text"
+
+# URL with colons
+-e LDAP_ACCOUNT_ADDITIONAL_ATTRIBUTES="website:Website~: https~://example.com::url"
+```
+
 ### Available Field Types
 
 | Type | Description | UI Presentation |

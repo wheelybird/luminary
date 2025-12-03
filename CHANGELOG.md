@@ -132,7 +132,7 @@
 - **[#224](https://github.com/wheelybird/luminary/issues/224)** - Reset password email templates now used for admin and self-service password changes
 - **[#219](https://github.com/wheelybird/luminary/issues/219)** - Show both email and UID fields in forms (removed conditional field hiding)
 - **[#218](https://github.com/wheelybird/luminary/issues/218)** - SERVER_PATH properly applied behind reverse proxy (url() helper function)
-- **[#227](https://github.com/wheelybird/luminary/issues/227)** - Backslash escape sequences in custom attribute configuration (split_escaped() function)
+- **[#227](https://github.com/wheelybird/luminary/issues/227)** - Tilde escape sequences in custom attribute configuration (split_escaped() function, uses ~ instead of \ to avoid shell escaping issues)
 - Character encoding issues with international characters in LDAP attributes
 - Form validation error messages and client/server-side validation
 - Photo upload validation and error handling for invalid formats

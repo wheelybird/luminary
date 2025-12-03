@@ -818,11 +818,14 @@ function ldap_get_group_name_from_gid($ldap_connection,$gid) {
 ##################################
 
 /**
- * Split string by delimiter, respecting backslash escapes
+ * Split string by delimiter, respecting tilde escapes
  *
  * @param string $str        String to split
  * @param string $delimiter  Delimiter character
  * @return array            Split parts with escapes removed
+ *
+ * Escape character: ~ (tilde)
+ * Examples: ~: for literal colon, ~, for literal comma, ~~ for literal tilde
  */
 function split_escaped($str, $delimiter) {
   $parts = array();
@@ -835,7 +838,7 @@ function split_escaped($str, $delimiter) {
     if ($escaped) {
       $current .= $char;
       $escaped = false;
-    } elseif ($char === '\\') {
+    } elseif ($char === '~') {
       $escaped = true;
     } elseif ($char === $delimiter) {
       $parts[] = $current;
