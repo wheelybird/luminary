@@ -2,7 +2,7 @@
 set -e
 
 ssl_dir="/opt/ssl"
-php_dir="/opt/ldap_user_manager"
+php_dir="/opt/luminary"
 
 env_file_replace() {
   for env_file in $(env|grep _FILE=); do
@@ -174,7 +174,9 @@ fi
 
 ########################
 #If <env_var>_FILE is set, read and export env_var from the referenced file's contents
+
 env_file_replace
+
 
 ########################
 #Run Apache

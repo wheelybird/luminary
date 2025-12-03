@@ -295,7 +295,8 @@ function ldap_hashed_password($password) {
 
  }
 
- error_log("$log_prefix password update - algo $hash_algo | pwd $hashed_pwd",0);
+ // Log only the algorithm used, never log passwords (even hashed)
+ error_log("$log_prefix LDAP password: using '$hash_algo' as the hashing method",0);
 
  return $hashed_pwd;
 
@@ -478,6 +479,11 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
  $ldap_search_query = "({$LDAP['group_attribute']}=". ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
  $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query, array($LDAP['group_membership_attribute']));
 
+ if ($ldap_search === false) {
+  if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix LDAP search failed for group {$group_name}: " . ldap_error($ldap_connection), 0); }
+  return array();
+ }
+
  $result = @ ldap_get_entries($ldap_connection, $ldap_search);
  if ($result) { $result_count = $result['count']; } else { $result_count = 0; }
 
@@ -485,14 +491,22 @@ function ldap_get_group_members($ldap_connection,$group_name,$start=0,$entries=N
 
  if ($result_count > 0) {
 
-  foreach ($result[0][$LDAP['group_membership_attribute']] as $key => $value) {
+  // Check if the membership attribute exists in the result (use lowercase key)
+  $membership_attr = strtolower($LDAP['group_membership_attribute']);
+  if (isset($result[0][$membership_attr]) && is_array($result[0][$membership_attr])) {
+   foreach ($result[0][$membership_attr] as $key => $value) {
 
-   if ($key !== 'count' and !empty($value)) {
-    $this_member = preg_replace("/^.*?=(.*?),.*/", "$1", $value);
-    array_push($records, $this_member);
-    if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix {$value} is a member",0); }
+    if ($key !== 'count' and !empty($value)) {
+     // Skip placeholder member for RFC2307bis
+     if ($value === "cn=placeholder") {
+      continue;
+     }
+     $this_member = preg_replace("/^.*?=(.*?),.*/", "$1", $value);
+     array_push($records, $this_member);
+     if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix {$value} is a member",0); }
+    }
+
    }
-
   }
 
   $actual_result_count = count($records);
@@ -523,16 +537,29 @@ function ldap_is_group_member($ldap_connection,$group_name,$username) {
  $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
  $ldap_search_query = "({$LDAP['group_attribute']}=" . ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
- $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query);
+ // Explicitly request the membership attribute
+ $ldap_search = @ ldap_search($ldap_connection, "{$LDAP['group_dn']}", $ldap_search_query, array($LDAP['group_membership_attribute']));
 
  if ($ldap_search) {
    $result = ldap_get_entries($ldap_connection, $ldap_search);
+
+   // Check if group exists
+   if ($result['count'] == 0) {
+     return FALSE;
+   }
 
    if ($LDAP['group_membership_uses_uid'] == FALSE) {
      $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
    }
 
-   if (preg_grep ("/^{$username}$/i", $result[0][$LDAP['group_membership_attribute']])) {
+   // Check if membership attribute exists in the result
+   $membership_attr = strtolower($LDAP['group_membership_attribute']);
+   if (!isset($result[0][$membership_attr])) {
+     return FALSE;
+   }
+
+   // Placeholder member should never match a real user
+   if (preg_grep ("/^{$username}$/i", $result[0][$membership_attr])) {
      return TRUE;
    }
    else {
@@ -597,9 +624,44 @@ function ldap_new_group($ldap_connection,$group_name,$initial_member="",$extra_a
      if ($LDAP['group_membership_uses_uid'] == FALSE and $initial_member != "") { $initial_member = "{$LDAP['account_attribute']}=$initial_member,{$LDAP['user_dn']}"; }
 
      $new_group_array=array( 'objectClass' => $LDAP['group_objectclasses'],
-                             'cn' => $new_group,
-                             $LDAP['group_membership_attribute'] => $initial_member
+                             'cn' => $new_group
                            );
+
+     // RFC2307bis requires a structural objectClass and at least one member
+     if ($rfc2307bis_available == TRUE) {
+       $has_structural_class = false;
+       $member_attribute = 'member';
+
+       // Check if a structural class is already present
+       if (in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+         $has_structural_class = true;
+         $member_attribute = 'member';
+       }
+       elseif (in_array('groupOfUniqueNames', $LDAP['group_objectclasses'])) {
+         $has_structural_class = true;
+         $member_attribute = 'uniqueMember';
+       }
+
+       // Add groupOfNames if no structural class is present
+       if (!$has_structural_class) {
+         $new_group_array['objectClass'][] = 'groupOfNames';
+         $member_attribute = 'member';
+       }
+
+       // Structural class requires at least one member, use placeholder if empty
+       if ($initial_member == "") {
+         $new_group_array[$member_attribute] = "cn=placeholder";
+       }
+       else {
+         $new_group_array[$member_attribute] = $initial_member;
+       }
+     }
+     else {
+       // RFC2307 - only add membership attribute if initial_member is not empty (fixes #230 - empty group creation)
+       if ($initial_member != "" && isset($LDAP['group_membership_attribute'])) {
+         $new_group_array[$LDAP['group_membership_attribute']] = $initial_member;
+       }
+     }
 
      $new_group_array = array_merge($new_group_array,$extra_attributes);
 
@@ -755,18 +817,53 @@ function ldap_get_group_name_from_gid($ldap_connection,$gid) {
 
 ##################################
 
+/**
+ * Split string by delimiter, respecting tilde escapes
+ *
+ * @param string $str        String to split
+ * @param string $delimiter  Delimiter character
+ * @return array            Split parts with escapes removed
+ *
+ * Escape character: ~ (tilde)
+ * Examples: ~: for literal colon, ~, for literal comma, ~~ for literal tilde
+ */
+function split_escaped($str, $delimiter) {
+  $parts = array();
+  $current = '';
+  $escaped = false;
+
+  for ($i = 0; $i < strlen($str); $i++) {
+    $char = $str[$i];
+
+    if ($escaped) {
+      $current .= $char;
+      $escaped = false;
+    } elseif ($char === '~') {
+      $escaped = true;
+    } elseif ($char === $delimiter) {
+      $parts[] = $current;
+      $current = '';
+    } else {
+      $current .= $char;
+    }
+  }
+
+  $parts[] = $current;
+  return $parts;
+}
+
 function ldap_complete_attribute_array($default_attributes,$additional_attributes) {
 
   if (isset($additional_attributes)) {
 
-    $user_attribute_r = explode(",", $additional_attributes);
+    $user_attribute_r = split_escaped($additional_attributes, ',');
     $to_merge = array();
 
     foreach ($user_attribute_r as $this_attr) {
 
       $this_r = array();
-      $kv = explode(":", $this_attr);
-      $attr_name = strtolower(filter_var($kv[0], FILTER_SANITIZE_FULL_SPECIAL_CHARS));
+      $kv = split_escaped($this_attr, ':');
+      $attr_name = strtolower(trim($kv[0]));
       $this_r['inputtype'] = "singleinput";
 
       if (substr($attr_name, -1) == '+') {
@@ -779,17 +876,27 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
         $attr_name = rtrim($attr_name, '^');
       }
 
-      if (preg_match('/^[a-zA-Z0-9\-]+$/', $attr_name) == 1) {
+      if (preg_match('/^[\p{L}\p{N}\-]+$/u', $attr_name) == 1) {
 
         if (isset($kv[1]) and $kv[1] != "") {
-          $this_r['label'] = filter_var($kv[1], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+          $this_r['label'] = trim($kv[1]);
         }
         else {
           $this_r['label'] = $attr_name;
         }
 
         if (isset($kv[2]) and $kv[2] != "") {
-          $this_r['default'] = filter_var($kv[2], FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+          $this_r['default'] = trim($kv[2]);
+        }
+
+        // Support optional 4th parameter for input type (textarea, tel, checkbox, email, url)
+        if (isset($kv[3]) and $kv[3] != "") {
+          $inputtype = strtolower(trim($kv[3]));
+          // Validate input type
+          $valid_types = array('textarea', 'tel', 'checkbox', 'email', 'url', 'multipleinput', 'binary');
+          if (in_array($inputtype, $valid_types)) {
+            $this_r['inputtype'] = $inputtype;
+          }
         }
 
         $to_merge[$attr_name] = $this_r;
@@ -813,7 +920,7 @@ function ldap_complete_attribute_array($default_attributes,$additional_attribute
 
 function ldap_new_account($ldap_connection,$account_r) {
 
-  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP;
+  global $log_prefix, $LDAP, $LDAP_DEBUG, $DEFAULT_USER_SHELL, $DEFAULT_USER_GROUP, $MFA_FEATURE_ENABLED, $MFA_REQUIRED_GROUPS;
 
   if (    isset($account_r['givenname'][0])
       and isset($account_r['sn'][0])
@@ -886,6 +993,30 @@ function ldap_new_account($ldap_connection,$account_r) {
            error_log("$log_prefix Unable to update cn=lastUID to $new_uid - this could cause user accounts to share the same UID.",0);
          }
        }
+
+       // Initialise MFA if enabled and user is in required group
+       if ($MFA_FEATURE_ENABLED) {
+         include_once "totp_functions.inc.php";
+         $user_dn = "{$LDAP['account_attribute']}=$account_identifier,{$LDAP['user_dn']}";
+
+         $mfa_result = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
+         if ($mfa_result['required']) {
+           // Add totpUser object class and set status to pending
+           $mfa_modifications = array(
+             'objectClass' => array_merge($objectclasses, array('totpUser')),
+             'totpStatus' => 'pending',
+             'totpEnrolledDate' => gmdate('YmdHis') . 'Z',
+           );
+
+           $add_mfa = @ ldap_mod_replace($ldap_connection, $user_dn, $mfa_modifications);
+           if ($add_mfa) {
+             error_log("$log_prefix Create account; Initialised MFA (pending) for $account_identifier",0);
+           } else {
+             error_log("$log_prefix Create account; Failed to initialise MFA for $account_identifier: " . ldap_error($ldap_connection),0);
+           }
+         }
+       }
+
        return TRUE;
      }
      else {
@@ -917,6 +1048,17 @@ function ldap_delete_account($ldap_connection,$username) {
 
  if (isset($username)) {
 
+  // First, remove user from all groups (fixes #215, #169)
+  $user_groups = ldap_user_group_membership($ldap_connection, $username);
+
+  foreach ($user_groups as $group) {
+    $removed = ldap_delete_member_from_group($ldap_connection, $group, $username);
+    if (!$removed) {
+      error_log("$log_prefix Warning: Failed to remove $username from group $group during account deletion",0);
+    }
+  }
+
+  // Now delete the user account
   $delete_query = "{$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ",{$LDAP['user_dn']}";
   $delete = @ ldap_delete($ldap_connection, $delete_query);
 
@@ -946,6 +1088,17 @@ function ldap_add_member_to_group($ldap_connection,$group_name,$username) {
 
   if ($LDAP['group_membership_uses_uid'] == FALSE) {
    $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
+  }
+
+  // For RFC2307bis, check if placeholder exists and remove it before adding real member
+  if ($rfc2307bis_available) {
+   $members = ldap_get_group_members($ldap_connection, $group_name);
+   if (empty($members)) {
+    // Group is empty (only has placeholder), remove placeholder first
+    $remove_placeholder = array($LDAP['group_membership_attribute'] => "cn=placeholder");
+    @ ldap_mod_del($ldap_connection,$group_dn,$remove_placeholder);
+    if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Removed placeholder from group '$group_name'",0); }
+   }
   }
 
   $group_update = array($LDAP['group_membership_attribute'] => $username);
@@ -988,6 +1141,23 @@ function ldap_delete_member_from_group($ldap_connection,$group_name,$username) {
 
     if ($update) {
      error_log("$log_prefix Removed '$username' from $group_name",0);
+
+     // For RFC2307bis, add placeholder if group is now empty
+     if ($rfc2307bis_available) {
+      $members = ldap_get_group_members($ldap_connection, $group_name);
+      if (empty($members)) {
+       // Group is now empty, add placeholder back
+       $add_placeholder = array($LDAP['group_membership_attribute'] => "cn=placeholder");
+       $placeholder_add = @ ldap_mod_add($ldap_connection,$group_dn,$add_placeholder);
+       if ($placeholder_add) {
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Added placeholder to empty group '$group_name'",0); }
+       }
+       else {
+        error_log("$log_prefix Warning: Couldn't add placeholder to empty group '$group_name': " . ldap_error($ldap_connection),0);
+       }
+      }
+     }
+
      return TRUE;
     }
     else {
@@ -1100,20 +1270,175 @@ function ldap_detect_rfc2307bis($ldap_connection) {
       }
     }
 
+    // Auto-configure group membership attributes if RFC2307bis is detected
+    // This maintains backward compatibility and ease-of-use
     if ($LDAP['rfc2307bis_available'] == TRUE) {
-      if (!isset($LDAP['group_membership_attribute'])) { $LDAP['group_membership_attribute'] = 'uniquemember'; }
-      if (!isset($LDAP['group_membership_uses_uid'])) { $LDAP['group_membership_uses_uid'] = FALSE; }
-      if (!in_array('groupOfUniqueNames',$LDAP['group_objectclasses'])) { array_push($LDAP['group_objectclasses'], 'groupOfUniqueNames'); }
-      return TRUE;
+
+      // Add groupOfUniqueNames objectclass if admin hasn't explicitly configured objectclasses
+      // and it's not already present
+      if (!getenv('LDAP_GROUP_ADDITIONAL_OBJECTCLASSES') &&
+          !in_array('groupOfUniqueNames', $LDAP['group_objectclasses']) &&
+          !in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-adding groupOfUniqueNames to group objectclasses for RFC2307bis",0); }
+        $LDAP['group_objectclasses'][] = 'groupOfUniqueNames';
+      }
+
+      // Auto-set membership attribute based on objectclasses if admin hasn't explicitly set it
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE') && !isset($LDAP['group_membership_attribute'])) {
+        if (in_array('groupOfUniqueNames', $LDAP['group_objectclasses'])) {
+          $LDAP['group_membership_attribute'] = 'uniqueMember';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to uniqueMember for RFC2307bis",0); }
+        }
+        elseif (in_array('groupOfNames', $LDAP['group_objectclasses'])) {
+          $LDAP['group_membership_attribute'] = 'member';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to member for RFC2307bis",0); }
+        }
+        else {
+          $LDAP['group_membership_attribute'] = 'memberUid';
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to memberUid (RFC2307)",0); }
+        }
+      }
+
+      // Auto-set group_membership_uses_uid based on membership attribute if admin hasn't explicitly set it
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_USES_UID') && !isset($LDAP['group_membership_uses_uid'])) {
+        if (isset($LDAP['group_membership_attribute']) && strtolower($LDAP['group_membership_attribute']) == 'memberuid') {
+          $LDAP['group_membership_uses_uid'] = TRUE;
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to TRUE",0); }
+        }
+        else {
+          $LDAP['group_membership_uses_uid'] = FALSE;
+          if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to FALSE",0); }
+        }
+      }
     }
     else {
-      if (!isset($LDAP['group_membership_attribute'])) { $LDAP['group_membership_attribute'] = 'memberuid'; }
-      if (!isset($LDAP['group_membership_uses_uid'])) { $LDAP['group_membership_uses_uid'] = TRUE; }
-      return FALSE;
+      // RFC2307 (not BIS) - set defaults if not already configured
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_ATTRIBUTE') && !isset($LDAP['group_membership_attribute'])) {
+        $LDAP['group_membership_attribute'] = 'memberUid';
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_attribute to memberUid (RFC2307)",0); }
+      }
+
+      if (!getenv('LDAP_GROUP_MEMBERSHIP_USES_UID') && !isset($LDAP['group_membership_uses_uid'])) {
+        $LDAP['group_membership_uses_uid'] = TRUE;
+        if ($LDAP_DEBUG == TRUE) { error_log("$log_prefix Auto-setting group_membership_uses_uid to TRUE (RFC2307)",0); }
+      }
     }
+
+    return $LDAP['rfc2307bis_available'];
 
   }
 
+}
+
+###################################
+# Unicode Support Helper Functions
+###################################
+
+/**
+ * Validate text fields (names, descriptions) - allows Unicode characters
+ *
+ * @param string $text The text to validate
+ * @param int $min Minimum length (default: 1)
+ * @param int $max Maximum length (default: 100)
+ * @return bool True if valid, false otherwise
+ */
+function validate_text($text, $min = 1, $max = 100) {
+    mb_internal_encoding('UTF-8');
+
+    $length = mb_strlen($text);
+    if ($length < $min || $length > $max) {
+        return false;
+    }
+
+    // Allow Unicode letters, combining marks, spaces, hyphens, apostrophes
+    return preg_match('/^[\p{L}\p{M}\s\'-]+$/u', $text) === 1;
+}
+
+/**
+ * Validate usernames - allows Unicode letters/numbers plus common symbols
+ *
+ * @param string $username The username to validate
+ * @return bool True if valid, false otherwise
+ */
+function validate_username($username) {
+    mb_internal_encoding('UTF-8');
+
+    $length = mb_strlen($username);
+    if ($length < 2 || $length > 64) {
+        return false;
+    }
+
+    // Unicode letters, numbers, underscore, dot, hyphen
+    if (!preg_match('/^[\p{L}\p{N}_.-]+$/u', $username)) {
+        return false;
+    }
+
+    // Don't allow leading/trailing dots or hyphens
+    if (preg_match('/^[.-]|[.-]$/u', $username)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Sanitise value for LDAP storage
+ *
+ * @param string $value The value to sanitise
+ * @return string The sanitised value safe for LDAP
+ */
+function sanitise_for_ldap($value) {
+    $value = trim($value);
+    return ldap_escape($value, '', LDAP_ESCAPE_DN);
+}
+
+/**
+ * Sanitise value for HTML display
+ *
+ * @param string $value The value to sanitise
+ * @return string The sanitised value safe for HTML
+ */
+function sanitise_for_html($value) {
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Decode HTML entities from LDAP values for backward compatibility
+ *
+ * Converts old data that was incorrectly stored with HTML entities
+ * (e.g., "M&uuml;ller" -> "Müller") back to proper UTF-8.
+ *
+ * This function handles legacy data created before Unicode support
+ * was properly implemented. As users edit entries, data will naturally
+ * migrate to pure UTF-8 storage.
+ *
+ * @param string|array $value Value from LDAP (can be string or array)
+ * @return string|array Decoded value in the same format as input
+ *
+ * @deprecated TODO: Remove in v2.0 after data migration period
+ */
+function decode_ldap_value($value) {
+    // Handle arrays (multi-valued attributes)
+    if (is_array($value)) {
+        $decoded = array();
+        foreach ($value as $key => $val) {
+            // Skip 'count' key that LDAP arrays include
+            if ($key !== 'count') {
+                $decoded[$key] = html_entity_decode($val, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } else {
+                $decoded[$key] = $val;
+            }
+        }
+        return $decoded;
+    }
+
+    // Handle single values
+    if (is_string($value)) {
+        return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    // Return unchanged for other types (null, bool, etc.)
+    return $value;
 }
 
 ?>

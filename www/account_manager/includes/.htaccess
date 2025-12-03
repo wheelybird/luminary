@@ -1,0 +1,6 @@
+# Prevent direct HTTP access to includes directory
+# But allow PHP includes
+<FilesMatch "\.php$">
+  Order deny,allow
+  Deny from all
+</FilesMatch>
