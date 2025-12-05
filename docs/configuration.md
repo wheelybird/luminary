@@ -16,7 +16,6 @@ To update this file, run: `php docs/generate_config_docs.php`
 - [Audit logging 🔧](#audit-logging)
 - [Password policy 🔧](#password-policy)
 - [Account lifecycle 🔧](#account-lifecycle)
-- [Advanced group management 🔧](#advanced-group-management)
 - [Debug & logging](#debug-&-logging)
 
 ---
@@ -467,8 +466,11 @@ SMTP configuration and email notifications
 | From email address<br><small>Email address for outgoing messages</small> | string | 📝 `admin@luminary.id` | `EMAIL_FROM_ADDRESS` | From email address |
 | From name for emails<br><small>Display name for outgoing messages</small> | string | 📝 `Luminary` | `EMAIL_FROM_NAME` | From name for emails |
 | Reply-to email address<br><small>Email address for reply-to header (optional)</small> | string | *Not set* | `EMAIL_REPLY_TO_ADDRESS` | Reply-to email address |
+| Email user on password change<br><small>Send notification email to user when their password is changed (by them or admin). Does not include the password.</small> | ✅ boolean | `FALSE` | `EMAIL_USER_ON_PASSWORD_CHANGE` | Email user on password change |
+| Email admin when user changes password<br><small>Send notification to admin email when a user changes their own password (requires ADMIN_EMAIL to be set)</small> | ✅ boolean | `FALSE` | `EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE` | Email admin when user changes password |
+| Administrator email address<br><small>Email address for admin notifications (password changes, security alerts, etc.)</small> | string | *Not set* | `ADMIN_EMAIL` | Administrator email address |
 | Enable account request feature<br><small>Requires SMTP to be configured</small> | ✅ boolean | `FALSE` | `ACCOUNT_REQUESTS_ENABLED` | Enable account request feature |
-| Email for account requests<br><small>Where account request notifications are sent</small> | string | 📝 `admin@luminary.id` | `ACCOUNT_REQUESTS_EMAIL` | Email for account requests |
+| Email for account requests<br><small>Where account request notifications are sent. Falls back to ADMIN_EMAIL if not set.</small> | string | *Not set* | `ACCOUNT_REQUESTS_EMAIL` | Email for account requests |
 
 ### Details
 
@@ -562,6 +564,34 @@ Email address for reply-to header (optional)
 
 ---
 
+#### Email user on password change
+
+Send notification email to user when their password is changed (by them or admin). Does not include the password.
+
+**Environment Variable:** `EMAIL_USER_ON_PASSWORD_CHANGE`
+
+**Default:** `FALSE`
+
+---
+
+#### Email admin when user changes password
+
+Send notification to admin email when a user changes their own password (requires ADMIN_EMAIL to be set)
+
+**Environment Variable:** `EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE`
+
+**Default:** `FALSE`
+
+---
+
+#### Administrator email address
+
+Email address for admin notifications (password changes, security alerts, etc.)
+
+**Environment Variable:** `ADMIN_EMAIL`
+
+---
+
 #### Enable account request feature
 
 Requires SMTP to be configured
@@ -574,11 +604,9 @@ Requires SMTP to be configured
 
 #### Email for account requests
 
-Where account request notifications are sent
+Where account request notifications are sent. Falls back to ADMIN_EMAIL if not set.
 
 **Environment Variable:** `ACCOUNT_REQUESTS_EMAIL`
-
-**Default:** `admin@luminary.id`
 
 ---
 
@@ -921,7 +949,7 @@ Account expiration and automated management (optional)
 
 | Configuration | Type | Default | Environment Variable | Description |
 |--------------|------|---------|---------------------|-------------|
-| Enable account lifecycle management<br><small>Automatic account expiration and cleanup</small> | ✅ boolean | `FALSE` | `LIFECYCLE_ENABLED` | Enable account lifecycle management |
+| Enable account lifecycle management<br><small>Enforces account expiration at login time (no background jobs required)</small> | ✅ boolean | `FALSE` | `LIFECYCLE_ENABLED` | Enable account lifecycle management |
 | Enable account expiration<br><small>Automatically disable accounts after expiry date</small> | ✅ boolean | `FALSE` | `ACCOUNT_EXPIRY_ENABLED` | Enable account expiration |
 | Account inactivity threshold<br><small>Days of inactivity before account is disabled</small> | integer | 📝 `90` | `ACCOUNT_INACTIVE_DAYS` | Account inactivity threshold |
 | Account expiry warning period<br><small>Days before expiry to send warning email</small> | integer | 📝 `14` | `ACCOUNT_EXPIRY_WARNING_DAYS` | Account expiry warning period |
@@ -931,7 +959,7 @@ Account expiration and automated management (optional)
 
 #### Enable account lifecycle management
 
-Automatic account expiration and cleanup
+Enforces account expiration at login time (no background jobs required)
 
 **Environment Variable:** `LIFECYCLE_ENABLED`
 
@@ -974,51 +1002,6 @@ Days before expiry to send warning email
 Automatically delete expired accounts (use with caution)
 
 **Environment Variable:** `ACCOUNT_CLEANUP_ENABLED`
-
-**Default:** `FALSE`
-
----
-
-
-## Advanced group management 🔧
-
-Enhanced group management features (optional)
-
-> **Note:** This is an optional feature. Set `GROUP_BULK_OPERATIONS_ENABLED=TRUE` to enable.
-
-| Configuration | Type | Default | Environment Variable | Description |
-|--------------|------|---------|---------------------|-------------|
-| Enable bulk group operations<br><small>Add/remove multiple users to groups at once</small> | ✅ boolean | `FALSE` | `GROUP_BULK_OPERATIONS_ENABLED` | Enable bulk group operations |
-| Enable group templates<br><small>Create groups from predefined templates</small> | ✅ boolean | `FALSE` | `GROUP_TEMPLATES_ENABLED` | Enable group templates |
-| Enable nested groups<br><small>Groups can contain other groups (requires RFC2307bis)</small> | ✅ boolean | `FALSE` | `GROUP_NESTING_ENABLED` | Enable nested groups |
-
-### Details
-
-#### Enable bulk group operations
-
-Add/remove multiple users to groups at once
-
-**Environment Variable:** `GROUP_BULK_OPERATIONS_ENABLED`
-
-**Default:** `FALSE`
-
----
-
-#### Enable group templates
-
-Create groups from predefined templates
-
-**Environment Variable:** `GROUP_TEMPLATES_ENABLED`
-
-**Default:** `FALSE`
-
----
-
-#### Enable nested groups
-
-Groups can contain other groups (requires RFC2307bis)
-
-**Environment Variable:** `GROUP_NESTING_ENABLED`
 
 **Default:** `FALSE`
 
@@ -1151,4 +1134,4 @@ Example:
 ---
 
 *This documentation was automatically generated from the configuration registry.*
-*Last updated: 2025-12-03 14:50:50 UTC*
+*Last updated: 2025-12-05 15:37:57 UTC*
