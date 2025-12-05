@@ -94,46 +94,68 @@ if (isset($_POST['change_password'])) {
   }
 
   if ($password_changed) {
-    // Send password reset email notification
-    if ($EMAIL_SENDING_ENABLED) {
-      $ldap_connection = open_ldap_connection();
+    $ldap_connection = open_ldap_connection();
 
-      // Get user details for email
-      $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
-        "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
-        array('mail', 'givenname', 'sn'));
+    // Get user details for email notifications
+    $user_search = ldap_search($ldap_connection, $LDAP['user_dn'],
+      "({$LDAP['account_attribute']}=" . ldap_escape($USER_ID, "", LDAP_ESCAPE_FILTER) . ")",
+      array('mail', 'givenname', 'sn'));
 
-      if ($user_search) {
-        $user_entry = ldap_get_entries($ldap_connection, $user_search);
-        if ($user_entry['count'] > 0 && isset($user_entry[0]['mail'][0])) {
+    if ($user_search) {
+      $user_entry = ldap_get_entries($ldap_connection, $user_search);
+      if ($user_entry['count'] > 0 && isset($user_entry[0]['mail'][0])) {
+        $user_mail = $user_entry[0]['mail'][0];
+        $user_givenname = isset($user_entry[0]['givenname'][0]) ? $user_entry[0]['givenname'][0] : '';
+        $user_sn = isset($user_entry[0]['sn'][0]) ? $user_entry[0]['sn'][0] : '';
+        $full_name = trim($user_givenname . " " . $user_sn);
+
+        // Send password change notification to user if enabled
+        if ($EMAIL_SENDING_ENABLED && $EMAIL_USER_ON_PASSWORD_CHANGE) {
           include_once "mail_functions.inc.php";
 
-          $user_mail = $user_entry[0]['mail'][0];
-          $user_givenname = isset($user_entry[0]['givenname'][0]) ? $user_entry[0]['givenname'][0] : '';
-          $user_sn = isset($user_entry[0]['sn'][0]) ? $user_entry[0]['sn'][0] : '';
-          $full_name = trim($user_givenname . " " . $user_sn);
+          $timestamp = time();
+          $ip_address = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown';
 
-          $reset_mail_body = parse_mail_text(
-            $reset_password_mail_body,
-            '', // No password in reset email
+          $mail_body = parse_mail_text(
+            $password_changed_mail_body,
+            '', // No password in notification
             $USER_ID,
             $user_givenname,
-            $user_sn
+            $user_sn,
+            $timestamp,
+            $ip_address,
+            $ADMIN_EMAIL
           );
-          $reset_mail_subject = parse_mail_text(
-            $reset_password_mail_subject,
+          $mail_subject = parse_mail_text(
+            $password_changed_mail_subject,
             '',
             $USER_ID,
             $user_givenname,
-            $user_sn
+            $user_sn,
+            $timestamp,
+            $ip_address,
+            $ADMIN_EMAIL
           );
 
-          send_email($user_mail, $full_name, $reset_mail_subject, $reset_mail_body);
+          send_email($user_mail, $full_name, $mail_subject, $mail_body);
+        }
+
+        // Send notification to admin if enabled
+        if ($EMAIL_SENDING_ENABLED && $EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE && !empty($ADMIN_EMAIL)) {
+          include_once "mail_functions.inc.php";
+
+          $admin_subject = "User password change notification";
+          $admin_body = "User $USER_ID ($full_name) has changed their password.\n\n" .
+                        "Time: " . date('Y-m-d H:i:s T') . "\n" .
+                        "IP Address: " . (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown') . "\n\n" .
+                        "This is an automated notification from $ORGANISATION_NAME.";
+
+          send_email($ADMIN_EMAIL, 'Administrator', $admin_subject, $admin_body);
         }
       }
-
-      ldap_close($ldap_connection);
     }
+
+    ldap_close($ldap_connection);
 
     render_header("$ORGANISATION_NAME account manager - password changed");
   ?>

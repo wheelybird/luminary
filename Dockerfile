@@ -10,7 +10,8 @@ RUN apt-get update && \
         libldb-dev libldap2-dev libldap-common \
         libfreetype6-dev \
         libjpeg-dev \
-        libpng-dev && \
+        libpng-dev \
+        cron && \
     rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype && \
@@ -27,6 +28,7 @@ EXPOSE 80
 EXPOSE 443
 
 COPY www/ /opt/luminary
+RUN ln -s /opt/luminary /opt/ldap-user-manager
 RUN tar -xzf /tmp/v7.0.0.tar.gz -C /opt && mv /opt/PHPMailer-7.0.0 /opt/PHPMailer
 
 COPY entrypoint /usr/local/bin/entrypoint

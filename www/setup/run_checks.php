@@ -327,6 +327,61 @@ else {
        </ul>
       </div>
      </div>
+
+<?php
+
+// Only show LDAP storage check if it's enabled
+if ($USE_LDAP_AS_DB == TRUE) {
+?>
+     <div class="card">
+      <div class="card-header">LDAP storage for application data</div>
+      <div class="card-body">
+       <ul class="list-group">
+<?php
+
+// Check for applications OU
+$apps_ou_filter = "(&(objectclass=organizationalUnit)(ou=applications))";
+$ldap_apps_search = ldap_search($ldap_connection, "{$LDAP['base_dn']}", $apps_ou_filter);
+$apps_result = ldap_get_entries($ldap_connection, $ldap_apps_search);
+
+if ($apps_result['count'] != 1) {
+ print "$li_warn The applications OU (<strong>ou=applications,{$LDAP['base_dn']}</strong>) doesn't exist. ";
+ print "<a href='#' data-bs-toggle='popover' data-bs-trigger='hover focus' title='Applications OU' data-bs-content='";
+ print "This organisational unit stores application-specific data entries.";
+ print "'>What's this?</a>";
+ print "<label class='float-end'><input type='checkbox' name='setup_apps_ou' class='float-end' checked>Create?&nbsp;</label>";
+ print "</li>\n";
+ $show_finish_button = FALSE;
+}
+else {
+ print "$li_good The applications OU (<strong>ou=applications,{$LDAP['base_dn']}</strong>) is present.</li>";
+}
+
+// Check for cn=luminary entry
+$luminary_filter = "(&(objectclass=device)(cn=luminary))";
+$ldap_luminary_search = ldap_search($ldap_connection, "{$LDAP['base_dn']}", $luminary_filter);
+$luminary_result = ldap_get_entries($ldap_connection, $ldap_luminary_search);
+
+if ($luminary_result['count'] != 1) {
+ print "$li_warn The <strong>cn=luminary</strong> entry doesn't exist. ";
+ print "<a href='#' data-bs-toggle='popover' data-bs-trigger='hover focus' title='Luminary application data storage' data-bs-content='";
+ print "This entry stores temporary application data such as sessions, password reset tokens, and rate limits when LDAP storage is enabled (USE_LDAP_AS_DB=TRUE). Without it, data will be stored in /tmp and lost on container restart.";
+ print "'>What's this?</a>";
+ print "<label class='float-end'><input type='checkbox' name='setup_luminary_entry' class='float-end' checked>Create?&nbsp;</label>";
+ print "</li>\n";
+ $show_finish_button = FALSE;
+}
+else {
+ print "$li_good The <strong>cn=luminary</strong> application data entry is present.</li>";
+}
+
+?>
+       </ul>
+      </div>
+     </div>
+<?php
+}
+?>
 <?php
 
 ##############

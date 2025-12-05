@@ -492,6 +492,85 @@ $CONFIG_REGISTRY = array(
     'display_code' => true
   ),
 
+  // ===== Password Reset Settings =====
+
+  'PASSWORD_RESET_ENABLED' => array(
+    'category' => 'password_reset',
+    'description' => 'Enable self-service password reset',
+    'help' => 'Allows users to reset forgotten passwords via email verification',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_ENABLED',
+    'variable' => '$PASSWORD_RESET_ENABLED'
+  ),
+
+  'USE_LDAP_AS_DB' => array(
+    'category' => 'password_reset',
+    'description' => 'Store persistent data in LDAP',
+    'help' => 'Store password reset tokens, sessions, and other persistent data in LDAP instead of /tmp. Prevents data loss on ephemeral container restarts and enables horizontal scaling. Requires cn=luminary,ou=applications entry (can be created via admin UI).',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'USE_LDAP_AS_DB',
+    'variable' => '$USE_LDAP_AS_DB'
+  ),
+
+  'PASSWORD_RESET_TOKEN_EXPIRY_MINUTES' => array(
+    'category' => 'password_reset',
+    'description' => 'Password reset token expiry time',
+    'help' => 'Minutes until reset link expires',
+    'type' => 'integer',
+    'default' => 60,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_TOKEN_EXPIRY_MINUTES',
+    'variable' => '$PASSWORD_RESET_TOKEN_EXPIRY_MINUTES'
+  ),
+
+  'PASSWORD_RESET_RATE_LIMIT_REQUESTS' => array(
+    'category' => 'password_reset',
+    'description' => 'Maximum reset requests per time window',
+    'help' => 'Maximum number of reset requests allowed per email address',
+    'type' => 'integer',
+    'default' => 3,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_RATE_LIMIT_REQUESTS',
+    'variable' => '$PASSWORD_RESET_RATE_LIMIT_REQUESTS'
+  ),
+
+  'PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES' => array(
+    'category' => 'password_reset',
+    'description' => 'Rate limit time window',
+    'help' => 'Time window for rate limiting (minutes)',
+    'type' => 'integer',
+    'default' => 60,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES',
+    'variable' => '$PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES'
+  ),
+
+  'PASSWORD_RESET_MAX_ATTEMPTS' => array(
+    'category' => 'password_reset',
+    'description' => 'Maximum failed validation attempts',
+    'help' => 'Failed attempts before account lockout',
+    'type' => 'integer',
+    'default' => 5,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_MAX_ATTEMPTS',
+    'variable' => '$PASSWORD_RESET_MAX_ATTEMPTS'
+  ),
+
+  'PASSWORD_RESET_LOCKOUT_DURATION_MINUTES' => array(
+    'category' => 'password_reset',
+    'description' => 'Account lockout duration',
+    'help' => 'Minutes to lock account after max failed attempts',
+    'type' => 'integer',
+    'default' => 60,
+    'mandatory' => false,
+    'env_var' => 'PASSWORD_RESET_LOCKOUT_DURATION_MINUTES',
+    'variable' => '$PASSWORD_RESET_LOCKOUT_DURATION_MINUTES'
+  ),
+
   // ===== User Profile Settings =====
 
   'DEFAULT_USER_EDITABLE_ATTRIBUTES' => array(
@@ -661,6 +740,40 @@ $CONFIG_REGISTRY = array(
     'display_code' => true
   ),
 
+  'EMAIL_USER_ON_PASSWORD_CHANGE' => array(
+    'category' => 'email',
+    'description' => 'Email user on password change',
+    'help' => 'Send notification email to user when their password is changed (by them or admin). Does not include the password.',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'EMAIL_USER_ON_PASSWORD_CHANGE',
+    'variable' => '$EMAIL_USER_ON_PASSWORD_CHANGE'
+  ),
+
+  'EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE' => array(
+    'category' => 'email',
+    'description' => 'Email admin when user changes password',
+    'help' => 'Send notification to admin email when a user changes their own password (requires ADMIN_EMAIL to be set)',
+    'type' => 'boolean',
+    'default' => false,
+    'mandatory' => false,
+    'env_var' => 'EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE',
+    'variable' => '$EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE'
+  ),
+
+  'ADMIN_EMAIL' => array(
+    'category' => 'email',
+    'description' => 'Administrator email address',
+    'help' => 'Email address for admin notifications (password changes, security alerts, etc.)',
+    'type' => 'string',
+    'default' => null,
+    'mandatory' => false,
+    'env_var' => 'ADMIN_EMAIL',
+    'variable' => '$ADMIN_EMAIL',
+    'display_code' => true
+  ),
+
   'ACCOUNT_REQUESTS_ENABLED' => array(
     'category' => 'email',
     'description' => 'Enable account request feature',
@@ -675,9 +788,9 @@ $CONFIG_REGISTRY = array(
   'ACCOUNT_REQUESTS_EMAIL' => array(
     'category' => 'email',
     'description' => 'Email for account requests',
-    'help' => 'Where account request notifications are sent',
+    'help' => 'Where account request notifications are sent. Falls back to ADMIN_EMAIL if not set.',
     'type' => 'string',
-    'default' => 'admin@luminary.id',
+    'default' => null,
     'mandatory' => false,
     'env_var' => 'ACCOUNT_REQUESTS_EMAIL',
     'variable' => '$ACCOUNT_REQUESTS_EMAIL',
@@ -985,7 +1098,7 @@ $CONFIG_REGISTRY = array(
   'LIFECYCLE_ENABLED' => array(
     'category' => 'lifecycle',
     'description' => 'Enable account lifecycle management',
-    'help' => 'Automatic account expiration and cleanup',
+    'help' => 'Enforces account expiration at login time (no background jobs required)',
     'type' => 'boolean',
     'default' => false,
     'mandatory' => false,
@@ -1035,41 +1148,6 @@ $CONFIG_REGISTRY = array(
     'mandatory' => false,
     'env_var' => 'ACCOUNT_CLEANUP_ENABLED',
     'variable' => '$ACCOUNT_CLEANUP_ENABLED'
-  ),
-
-  // ===== Advanced Group Management (Optional Feature) =====
-
-  'GROUP_BULK_OPERATIONS_ENABLED' => array(
-    'category' => 'group_mgmt',
-    'description' => 'Enable bulk group operations',
-    'help' => 'Add/remove multiple users to groups at once',
-    'type' => 'boolean',
-    'default' => false,
-    'mandatory' => false,
-    'env_var' => 'GROUP_BULK_OPERATIONS_ENABLED',
-    'variable' => '$GROUP_BULK_OPERATIONS_ENABLED'
-  ),
-
-  'GROUP_TEMPLATES_ENABLED' => array(
-    'category' => 'group_mgmt',
-    'description' => 'Enable group templates',
-    'help' => 'Create groups from predefined templates',
-    'type' => 'boolean',
-    'default' => false,
-    'mandatory' => false,
-    'env_var' => 'GROUP_TEMPLATES_ENABLED',
-    'variable' => '$GROUP_TEMPLATES_ENABLED'
-  ),
-
-  'GROUP_NESTING_ENABLED' => array(
-    'category' => 'group_mgmt',
-    'description' => 'Enable nested groups',
-    'help' => 'Groups can contain other groups (requires RFC2307bis)',
-    'type' => 'boolean',
-    'default' => false,
-    'mandatory' => false,
-    'env_var' => 'GROUP_NESTING_ENABLED',
-    'variable' => '$GROUP_NESTING_ENABLED'
   ),
 
   // ===== Debug & Logging =====
@@ -1311,6 +1389,19 @@ $GROUP_MFA_ATTRS = array(
 );
 
 ##############################################################################
+# Password Reset Settings
+##############################################################################
+
+$PASSWORD_RESET_ENABLED = ((strcasecmp(getenv('PASSWORD_RESET_ENABLED'),'TRUE') == 0) ? TRUE : get_config_default('PASSWORD_RESET_ENABLED'));
+$USE_LDAP_AS_DB = ((strcasecmp(getenv('USE_LDAP_AS_DB'),'TRUE') == 0) ? TRUE : get_config_default('USE_LDAP_AS_DB'));
+
+$PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = (is_numeric(getenv('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES')) ? (int)getenv('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES') : get_config_default('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES'));
+$PASSWORD_RESET_RATE_LIMIT_REQUESTS = (is_numeric(getenv('PASSWORD_RESET_RATE_LIMIT_REQUESTS')) ? (int)getenv('PASSWORD_RESET_RATE_LIMIT_REQUESTS') : get_config_default('PASSWORD_RESET_RATE_LIMIT_REQUESTS'));
+$PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES = (is_numeric(getenv('PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES')) ? (int)getenv('PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES') : get_config_default('PASSWORD_RESET_RATE_LIMIT_WINDOW_MINUTES'));
+$PASSWORD_RESET_MAX_ATTEMPTS = (is_numeric(getenv('PASSWORD_RESET_MAX_ATTEMPTS')) ? (int)getenv('PASSWORD_RESET_MAX_ATTEMPTS') : get_config_default('PASSWORD_RESET_MAX_ATTEMPTS'));
+$PASSWORD_RESET_LOCKOUT_DURATION_MINUTES = (is_numeric(getenv('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES')) ? (int)getenv('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES') : get_config_default('PASSWORD_RESET_LOCKOUT_DURATION_MINUTES'));
+
+##############################################################################
 # User Profile Settings
 ##############################################################################
 
@@ -1352,7 +1443,7 @@ function is_user_editable($attribute) {
 ##############################################################################
 
 $SMTP['host'] = getenv('SMTP_HOSTNAME');
-$SMTP['port'] = (is_numeric(getenv('SMTP_PORT')) ? getenv('SMTP_PORT') : get_config_default('SMTP_PORT'));
+$SMTP['port'] = (is_numeric(getenv('SMTP_HOST_PORT')) ? getenv('SMTP_HOST_PORT') : get_config_default('SMTP_HOST_PORT'));
 $SMTP['user'] = getenv('SMTP_USERNAME');
 
 // Handle password from env or file
@@ -1374,8 +1465,19 @@ $EMAIL_DOMAIN = getenv('EMAIL_DOMAIN');
 
 $EMAIL_SENDING_ENABLED = (!empty($SMTP['host']));
 
+$EMAIL_USER_ON_PASSWORD_CHANGE = ((strcasecmp(getenv('EMAIL_USER_ON_PASSWORD_CHANGE'),'TRUE') == 0) ? TRUE : get_config_default('EMAIL_USER_ON_PASSWORD_CHANGE'));
+$EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE = ((strcasecmp(getenv('EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE'),'TRUE') == 0) ? TRUE : get_config_default('EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE'));
+$ADMIN_EMAIL = (getenv('ADMIN_EMAIL') ? getenv('ADMIN_EMAIL') : get_config_default('ADMIN_EMAIL'));
+
 $ACCOUNT_REQUESTS_ENABLED = ((strcasecmp(getenv('ACCOUNT_REQUESTS_ENABLED'),'TRUE') == 0) ? TRUE : get_config_default('ACCOUNT_REQUESTS_ENABLED'));
-$ACCOUNT_REQUESTS_EMAIL = (getenv('ACCOUNT_REQUESTS_EMAIL') ? getenv('ACCOUNT_REQUESTS_EMAIL') : get_config_default('ACCOUNT_REQUESTS_EMAIL'));
+// Account requests email with fallback to ADMIN_EMAIL
+$ACCOUNT_REQUESTS_EMAIL = getenv('ACCOUNT_REQUESTS_EMAIL');
+if (!$ACCOUNT_REQUESTS_EMAIL) {
+  $ACCOUNT_REQUESTS_EMAIL = $ADMIN_EMAIL; // Fall back to admin email
+}
+if (!$ACCOUNT_REQUESTS_EMAIL) {
+  $ACCOUNT_REQUESTS_EMAIL = get_config_default('ACCOUNT_REQUESTS_EMAIL');
+}
 
 ##############################################################################
 # Interface & Branding

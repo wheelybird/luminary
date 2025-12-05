@@ -1,9 +1,10 @@
 <?php
 
 set_include_path( ".:" . __DIR__ . "/../includes/");
-session_start();
 
 include_once "web_functions.inc.php";
+
+// Sessions are now initialized automatically in web_functions.inc.php
 
 render_header("$ORGANISATION_NAME - request an account");
 

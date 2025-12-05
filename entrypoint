@@ -28,7 +28,7 @@ fi
 
 if [ "$LDAP_TLS_CACERT" ]; then
   echo "$LDAP_TLS_CACERT" >/opt/ca.crt
-  mkdir -p /etc/ldap  
+  mkdir -p /etc/ldap
   sed -i "s/TLS_CACERT.*/TLS_CACERT \/opt\/ca.crt/" /etc/ldap/ldap.conf
 fi
 
@@ -147,7 +147,7 @@ EoHTTPrd
   fi
 
   echo "Listen ${SERVER_PORT:-443}" >> /etc/apache2/ports.conf
-  
+
   cat <<EoHTTPSC >>/etc/apache2/sites-enabled/lum.conf
 
 <VirtualHost _default_:${SERVER_PORT:-443}>
@@ -176,6 +176,35 @@ fi
 #If <env_var>_FILE is set, read and export env_var from the referenced file's contents
 
 env_file_replace
+
+
+########################
+#Set up cron for LDAP storage cleanup (only if enabled)
+#Run daily at random time between 3-5am to avoid multiple instances colliding
+
+if [ "${USE_LDAP_AS_DB,,}" == "true" ]; then
+  # Generate random minute (0-59) and hour (3 or 4)
+  RANDOM_MINUTE=$((RANDOM % 60))
+  RANDOM_HOUR=$((3 + RANDOM % 2))  # Either 3 or 4
+
+  echo "LDAP storage enabled - setting up daily cleanup at ${RANDOM_HOUR}:$(printf '%02d' $RANDOM_MINUTE)"
+
+  # Create crontab entry
+  cat > /etc/cron.d/luminary-cleanup << EOF
+# Luminary LDAP storage cleanup
+# Runs daily at randomised time between 3-5am
+# Also cleans /tmp rate limit files and session cache
+$RANDOM_MINUTE $RANDOM_HOUR * * * root /usr/local/bin/php $php_dir/includes/cleanup_ldap_storage.php > /proc/1/fd/1 2>&1
+EOF
+
+  chmod 0644 /etc/cron.d/luminary-cleanup
+
+  # Start cron daemon
+  echo "Starting cron daemon..."
+  cron
+else
+  echo "LDAP storage disabled - skipping automated cleanup cron"
+fi
 
 
 ########################

@@ -45,7 +45,6 @@ function custom_error_handler($errno, $errstr, $errfile, $errline) {
     E_USER_ERROR => 'User Error',
     E_USER_WARNING => 'User Warning',
     E_USER_NOTICE => 'User Notice',
-    E_STRICT => 'Strict Notice',
     E_RECOVERABLE_ERROR => 'Recoverable Error',
     E_DEPRECATED => 'Deprecated',
     E_USER_DEPRECATED => 'User Deprecated'
@@ -55,7 +54,7 @@ function custom_error_handler($errno, $errstr, $errfile, $errline) {
 
   // Log detailed error message to stderr (Docker logs)
   $log_message = "PHP $error_type: $errstr in $errfile on line $errline";
-  fwrite(STDERR, date('[Y-m-d H:i:s] ') . $log_message . "\n");
+  @file_put_contents('php://stderr', date('[Y-m-d H:i:s] ') . $log_message . "\n", FILE_APPEND);
 
   // For fatal errors, show generic error page
   if ($errno == E_ERROR || $errno == E_USER_ERROR || $errno == E_RECOVERABLE_ERROR) {
@@ -75,7 +74,7 @@ function custom_exception_handler($exception) {
   $log_message = "Uncaught Exception: " . $exception->getMessage() . "\n" .
                  "File: " . $exception->getFile() . " on line " . $exception->getLine() . "\n" .
                  "Stack trace:\n" . $exception->getTraceAsString();
-  fwrite(STDERR, date('[Y-m-d H:i:s] ') . $log_message . "\n");
+  @file_put_contents('php://stderr', date('[Y-m-d H:i:s] ') . $log_message . "\n", FILE_APPEND);
 
   // Show generic error page to user
   show_generic_error_page($log_message);
@@ -180,6 +179,25 @@ $DEFAULT_COOKIE_OPTIONS = array( 'expires' => time()+(60 * $SESSION_TIMEOUT),
                                  'secure' => $NO_HTTPS ? FALSE : TRUE,
                                  'samesite' => 'strict'
                                );
+
+######################################################
+# SESSION INITIALISATION
+######################################################
+
+// Define constant to prevent direct access to include files
+if (!defined('LDAP_USER_MANAGER')) {
+  define('LDAP_USER_MANAGER', true);
+}
+
+// Initialise session handler (LDAP-backed if USE_LDAP_AS_DB is enabled)
+// This must be done before any session usage
+// Include LDAP functions first so session handler can use them
+include_once ("ldap_functions.inc.php");
+include_once ("ldap_app_data_functions.inc.php");
+include_once ("ldap_session_handler.inc.php");
+ldap_session_init();
+
+######################################################
 
 if ($REMOTE_HTTP_HEADERS_LOGIN) {
   login_via_headers();

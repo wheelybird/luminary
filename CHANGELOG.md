@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.0] - 2025-12-05
+
+### Added
+
+- Self-service password reset via email with token validation and rate limiting
+- Optional LDAP storage for application data (sessions, tokens, rate limits) with filesystem fallback
+- Automated daily cleanup of expired LDAP data via cron (randomised 3-5am)
+- New password reset email events and templates
+
+### Removed
+
+- GROUP_BULK_OPERATIONS_ENABLED, GROUP_TEMPLATES_ENABLED, GROUP_NESTING_ENABLED config placeholders (unimplemented features that were accidentally included)
+
+### Fixed
+
+- **[#242](https://github.com/wheelybird/luminary/issues/242)** - Fatal error when creating initial admin account (undefined STDERR constant)
+- **[#241](https://github.com/wheelybird/luminary/issues/241)** - Inconsistent password change email behaviour (checkbox now works correctly)
+- **[#240](https://github.com/wheelybird/luminary/issues/240)** - SMTP_HOST_PORT variable maintained for backwards compatibility
+- Object class preservation when updating users with MFA enabled (prevents `totpSecret` attribute errors)
+- Duplicate group membership update banners (removed duplicate handler include)
+
 ## [2.0.0] - 2025-11-29
 
 ### Added

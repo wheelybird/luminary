@@ -186,8 +186,7 @@ if ($ldap_search) {
 
  ################################################
 
-// Process group membership (modular handler)
-include __DIR__ . '/includes/handlers/user_groups_handler.php';
+// Group membership handler is now loaded via tab configuration system (see lines 121-128)
 
 ################
 
@@ -348,7 +347,7 @@ include __DIR__ . '/includes/handlers/user_groups_handler.php';
 
 
   <?php if ($can_send_email == TRUE) { ?>
-  if (check_regex.test(document.getElementById("mail").value) && document.getElementById("password").value.length > 0 ) {
+  if (check_regex.test(document.getElementById("mail").value) && document.getElementById("password_field").value.length > 0 ) {
     document.getElementById("send_email_checkbox").disabled = false;
   }
   else {

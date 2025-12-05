@@ -2,10 +2,10 @@
 
 set_include_path( ".:" . __DIR__ . "/../includes/");
 
-include "web_functions.inc.php";
-include "ldap_functions.inc.php";
-include "totp_functions.inc.php";
-include "audit_functions.inc.php";
+include_once "web_functions.inc.php";
+include_once "ldap_functions.inc.php";
+include_once "totp_functions.inc.php";
+include_once "audit_functions.inc.php";
 
 if (isset($_GET["unauthorised"])) { $display_unauth = TRUE; }
 if (isset($_GET["session_timeout"])) { $display_logged_out = TRUE; }
@@ -297,6 +297,12 @@ else {
       <input type="password" class="form-control" id="confirm" name="password">
      </div>
     </div>
+
+    <?php if ($PASSWORD_RESET_ENABLED == TRUE && $EMAIL_SENDING_ENABLED == TRUE) { ?>
+    <div class="text-center mb-3">
+      <a href="<?php echo url('/password_reset/request.php'); ?>">Forgot password?</a>
+    </div>
+    <?php } ?>
 
     <div class="text-center mb-3">
      <button type="submit" class="btn btn-secondary">Log in</button>

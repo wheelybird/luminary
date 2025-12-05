@@ -105,9 +105,25 @@ if (isset($_POST['update_account'])) {
     }
   }
 
+  // Preserve auxiliary object classes (like totpUser) when updating object classes
+  // Only ensure base object classes are present, don't remove auxiliary ones
   $existing_objectclasses = $user[0]['objectclass'];
   unset($existing_objectclasses['count']);
-  if ($existing_objectclasses != $LDAP['account_objectclasses']) { $to_update['objectclass'] = $LDAP['account_objectclasses']; }
+
+  if ($existing_objectclasses != $LDAP['account_objectclasses']) {
+    // Merge existing auxiliary classes with required base classes
+    $auxiliary_classes = array('totpUser', 'extensibleObject', 'posixAccount', 'shadowAccount');
+    $merged_classes = $LDAP['account_objectclasses'];
+
+    foreach ($existing_objectclasses as $existing_class) {
+      // Preserve auxiliary classes that aren't in the base set
+      if (in_array($existing_class, $auxiliary_classes) && !in_array($existing_class, $LDAP['account_objectclasses'])) {
+        $merged_classes[] = $existing_class;
+      }
+    }
+
+    $to_update['objectclass'] = $merged_classes;
+  }
 
   $updated_account = @ ldap_mod_replace($ldap_connection, $dn, $to_update);
 
@@ -126,12 +142,20 @@ if (isset($_POST['update_account'])) {
       $sn_for_mail = isset($sn[0]) ? $sn[0] : '';
       $full_name = trim($givenname_for_mail . " " . $sn_for_mail);
 
-      $mail_body = parse_mail_text($new_account_mail_body, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
-      $mail_subject = parse_mail_text($new_account_mail_subject, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+      // Use different template based on whether this is a password reset or new account
+      if (isset($password_was_changed) && $password_was_changed) {
+        // Password was changed - use reset template
+        $mail_body = parse_mail_text($reset_password_mail_body, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+        $mail_subject = parse_mail_text($reset_password_mail_subject, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+      } else {
+        // New account or other changes - use new account template
+        $mail_body = parse_mail_text($new_account_mail_body, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+        $mail_subject = parse_mail_text($new_account_mail_subject, $password, $account_identifier, $givenname_for_mail, $sn_for_mail);
+      }
 
       $sent_email = send_email($mail[0], $full_name, $mail_subject, $mail_body);
       if ($sent_email) {
-        $sent_email_message .= "  An email sent to {$mail[0]}.";
+        $sent_email_message .= "  An email was sent to {$mail[0]}.";
       }
       else {
         $sent_email_message .= "  Unfortunately the email wasn't sent; check the logs for more information.";
@@ -146,31 +170,38 @@ if (isset($_POST['update_account'])) {
       password_policy_add_to_history($ldap_connection, $dn, $new_password_hash);
     }
 
-    // Send password reset email notification if password was changed
-    if (isset($password_was_changed) && $password_was_changed && isset($mail[0]) && !empty($mail[0]) && $can_send_email == TRUE) {
+    // Send password reset notification if enabled and checkbox wasn't used
+    if (isset($password_was_changed) && $password_was_changed && isset($mail[0]) && !empty($mail[0]) &&
+        $can_send_email == TRUE && $EMAIL_USER_ON_PASSWORD_CHANGE == TRUE && !isset($_POST['send_email'])) {
       include_once "mail_functions.inc.php";
 
       // Handle mononym users for email (fixes #213, #171)
       $givenname_for_mail = isset($givenname[0]) ? $givenname[0] : '';
       $sn_for_mail = isset($sn[0]) ? $sn[0] : '';
 
-      $reset_mail_body = parse_mail_text(
-        $reset_password_mail_body,
-        '', // No password in reset email
+      $mail_body = parse_mail_text(
+        $admin_reset_mail_body,
+        '', // No password in admin reset notification
         $account_identifier,
         $givenname_for_mail,
-        $sn_for_mail
+        $sn_for_mail,
+        null, // No timestamp for admin-initiated reset
+        null, // No IP for admin-initiated reset
+        $ADMIN_EMAIL
       );
-      $reset_mail_subject = parse_mail_text(
-        $reset_password_mail_subject,
+      $mail_subject = parse_mail_text(
+        $admin_reset_mail_subject,
         '',
         $account_identifier,
         $givenname_for_mail,
-        $sn_for_mail
+        $sn_for_mail,
+        null,
+        null,
+        $ADMIN_EMAIL
       );
 
       $full_name = trim($givenname_for_mail . " " . $sn_for_mail);
-      send_email($mail[0], $full_name, $reset_mail_subject, $reset_mail_body);
+      send_email($mail[0], $full_name, $mail_subject, $mail_body);
     }
 
     // Audit log user update

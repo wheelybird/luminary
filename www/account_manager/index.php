@@ -7,12 +7,27 @@ include_once "ldap_functions.inc.php";
 include_once "totp_functions.inc.php";
 include_once "audit_functions.inc.php";
 include_once "module_functions.inc.php";
+include_once "ldap_app_data_functions.inc.php";
 set_page_access("admin");
 
 render_header("$ORGANISATION_NAME account manager");
 render_submenu();
 
 $ldap_connection = open_ldap_connection();
+
+// Handle LDAP storage entry creation
+if (isset($_POST['create_ldap_storage'])) {
+  $created = ldap_app_data_create_entry($ldap_connection);
+
+  if ($created) {
+    audit_log('ldap_storage_created', 'system', 'LDAP application data entry created', 'success', $USER_ID);
+    render_alert_banner("LDAP storage entry created successfully. Persistent data storage is now available.");
+  }
+  else {
+    audit_log('ldap_storage_create_failure', 'system', 'Failed to create LDAP application data entry', 'failure', $USER_ID);
+    render_alert_banner("Failed to create LDAP storage entry. Check the logs for more information.","danger",15000);
+  }
+}
 
 // Get pagination parameters
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -89,6 +104,36 @@ $people = array_slice($all_people, $offset, $per_page, true);
      Showing <?php echo count($people); ?> of <?php echo number_format($total_users); ?> users matching "<?php echo htmlspecialchars($filter); ?>"
    </div>
  <?php } ?>
+
+ <?php
+ // LDAP Storage Status - only show when there's an issue that needs admin attention
+ if (($USE_LDAP_AS_DB == TRUE || $PASSWORD_RESET_ENABLED == TRUE)) {
+   $ldap_storage_enabled = ($USE_LDAP_AS_DB == TRUE);
+   $ldap_entry_exists = ldap_app_data_entry_exists($ldap_connection);
+
+   // Only show card if LDAP is enabled but entry doesn't exist (needs action)
+   if ($ldap_storage_enabled && !$ldap_entry_exists) {
+ ?>
+ <div class="card mb-3 border-danger">
+   <div class="card-header bg-danger text-white">
+     <strong>⚠ Action Required: LDAP Storage Entry Missing</strong>
+   </div>
+   <div class="card-body">
+     <p><strong>LDAP persistent storage is enabled but the required entry doesn't exist.</strong></p>
+     <p>Sessions, password reset tokens, and other persistent data cannot be stored in LDAP until you create the storage entry.</p>
+     <p class="mb-3"><small class="text-muted">Currently using /tmp storage - data will be lost on container restart.</small></p>
+     <form method="post" class="d-inline">
+       <button type="submit" name="create_ldap_storage" class="btn btn-primary">
+         Create LDAP Storage Entry
+       </button>
+       <small class="text-muted ms-2">This will create cn=luminary,ou=applications in your LDAP directory</small>
+     </form>
+   </div>
+ </div>
+ <?php
+   }
+ }
+ ?>
 
  <table class="table table-striped">
   <thead>

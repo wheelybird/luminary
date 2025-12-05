@@ -350,6 +350,36 @@ function display_config_item($key, $metadata) {
               <th style="width: 40%;">Luminary Version</th>
               <td><span class="badge bg-primary"><?php echo htmlspecialchars($luminary_version); ?></span></td>
             </tr>
+            <tr>
+              <th>Persistent Data Storage</th>
+              <td>
+                <?php
+                  include_once "ldap_app_data_functions.inc.php";
+                  $ldap_connection_storage = open_ldap_connection();
+                  $using_ldap = false;
+                  $storage_status = '/tmp (ephemeral)';
+                  $storage_class = 'bg-warning';
+                  $storage_icon = 'bi-folder';
+
+                  if ($USE_LDAP_AS_DB == TRUE) {
+                    if (ldap_app_data_entry_exists($ldap_connection_storage)) {
+                      $using_ldap = true;
+                      $storage_status = 'LDAP (persistent)';
+                      $storage_class = 'bg-success';
+                      $storage_icon = 'bi-database';
+                    } else {
+                      $storage_status = '/tmp (LDAP enabled but entry missing)';
+                      $storage_class = 'bg-danger';
+                      $storage_icon = 'bi-exclamation-triangle';
+                    }
+                  }
+                  ldap_close($ldap_connection_storage);
+                ?>
+                <i class="bi <?php echo $storage_icon; ?>"></i>
+                <span class="badge <?php echo $storage_class; ?>"><?php echo htmlspecialchars($storage_status); ?></span>
+                <br><small class="text-muted">Sessions, password reset tokens</small>
+              </td>
+            </tr>
           </table>
         </div>
       </div>

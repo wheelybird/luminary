@@ -4,6 +4,7 @@ set_include_path( ".:" . __DIR__ . "/../includes/");
 
 include_once "web_functions.inc.php";
 include_once "ldap_functions.inc.php";
+include_once "ldap_app_data_functions.inc.php";
 include_once "module_functions.inc.php";
 
 validate_setup_cookie();
@@ -124,13 +125,32 @@ if (isset($_POST['fix_problems'])) {
  if (isset($_POST['setup_admins_group'])) {
 
   $group_add = ldap_new_group($ldap_connection,$LDAP['admins_group']);
-  
+
   if ($group_add == TRUE) {
    print "$li_good Created LDAP administrators group: <strong>{$LDAP['admins_group']}</strong></li>\n";
   }
   else {
    $error = ldap_error($ldap_connection);
    print "$li_fail Couldn't create LDAP administrators group: <pre>$error</pre></li>\n";
+   $no_errors = FALSE;
+  }
+ }
+
+ if (isset($_POST['setup_apps_ou']) || isset($_POST['setup_luminary_entry'])) {
+  // Use the shared function to create both ou=applications and cn=luminary
+  $ldap_storage_created = ldap_app_data_create_entry($ldap_connection);
+
+  if ($ldap_storage_created == TRUE) {
+   if (isset($_POST['setup_apps_ou'])) {
+    print "$li_good Created OU <strong>ou=applications,{$LDAP['base_dn']}</strong></li>\n";
+   }
+   if (isset($_POST['setup_luminary_entry'])) {
+    print "$li_good Created <strong>cn=luminary,ou=applications,{$LDAP['base_dn']}</strong></li>\n";
+   }
+  }
+  else {
+   $error = ldap_error($ldap_connection);
+   print "$li_fail Couldn't create LDAP storage entries: <pre>$error</pre></li>\n";
    $no_errors = FALSE;
   }
  }
