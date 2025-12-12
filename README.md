@@ -60,7 +60,7 @@ docker run \
   -e LDAP_ADMIN_BIND_PWD="admin_password" \
   -e LDAP_IGNORE_CERT_ERRORS="true" \
   --link openldap:openldap \
-  wheelybird/luminary:v2.1.0
+  wheelybird/luminary:v2.1.1
 ```
 
 ### 3. Run the setup wizard

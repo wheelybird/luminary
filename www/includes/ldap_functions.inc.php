@@ -548,8 +548,30 @@ function ldap_is_group_member($ldap_connection,$group_name,$username) {
      return FALSE;
    }
 
+   // If group membership uses UIDs (RFC2307), just use the username
+   // If it uses DNs (RFC2307BIS), we need to look up the full DN
    if ($LDAP['group_membership_uses_uid'] == FALSE) {
-     $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
+     // Search for user's full DN to handle nested OUs (fixes #246)
+     $user_search_query = "({$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ")";
+     $user_search = @ ldap_search($ldap_connection, "{$LDAP['user_dn']}", $user_search_query, array('dn'));
+
+     if ($user_search) {
+       $user_result = ldap_get_entries($ldap_connection, $user_search);
+       if ($user_result['count'] == 1) {
+         $username = $user_result[0]['dn'];
+       } else {
+         // User not found or multiple results
+         if ($LDAP_DEBUG == TRUE) {
+           error_log("$log_prefix ldap_is_group_member: Could not find unique DN for user $username (found {$user_result['count']} results)",0);
+         }
+         return FALSE;
+       }
+     } else {
+       if ($LDAP_DEBUG == TRUE) {
+         error_log("$log_prefix ldap_is_group_member: Failed to search for user $username: " . ldap_error($ldap_connection),0);
+       }
+       return FALSE;
+     }
    }
 
    // Check if membership attribute exists in the result
@@ -581,8 +603,30 @@ function ldap_user_group_membership($ldap_connection,$username) {
 
  $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
+ // If group membership uses UIDs (RFC2307), just use the username
+ // If it uses DNs (RFC2307BIS), we need to look up the full DN
  if ($LDAP['group_membership_uses_uid'] == FALSE) {
-  $username = "{$LDAP['account_attribute']}=$username,{$LDAP['user_dn']}";
+  // Search for user's full DN to handle nested OUs (fixes #246)
+  $user_search_query = "({$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ")";
+  $user_search = @ ldap_search($ldap_connection, "{$LDAP['user_dn']}", $user_search_query, array('dn'));
+
+  if ($user_search) {
+    $user_result = ldap_get_entries($ldap_connection, $user_search);
+    if ($user_result['count'] == 1) {
+      $username = $user_result[0]['dn'];
+    } else {
+      // User not found or multiple results
+      if ($LDAP_DEBUG == TRUE) {
+        error_log("$log_prefix ldap_user_group_membership: Could not find unique DN for user $username (found {$user_result['count']} results)",0);
+      }
+      return array();
+    }
+  } else {
+    if ($LDAP_DEBUG == TRUE) {
+      error_log("$log_prefix ldap_user_group_membership: Failed to search for user $username: " . ldap_error($ldap_connection),0);
+    }
+    return array();
+  }
  }
 
  $ldap_search_query = "(&(objectClass=posixGroup)({$LDAP['group_membership_attribute']}={$username}))";
