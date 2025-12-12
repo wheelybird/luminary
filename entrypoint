@@ -15,6 +15,10 @@ env_file_replace() {
   done
 }
 
+########################
+#Process _FILE environment variables early so they're available throughout the script
+env_file_replace
+
 if [ ! "$SERVER_HOSTNAME" ]; then export SERVER_HOSTNAME="ldapusermanager.org"; fi
 if [ ! "$SERVER_PATH" ]; then
   export SERVER_PATH="/";
@@ -25,6 +29,7 @@ fi
 
 #If LDAP_TLS_CACERT is set then write it out as a file
 #and set up the LDAP client conf to use it.
+#Note: _FILE variants are already processed by env_file_replace() above
 
 if [ "$LDAP_TLS_CACERT" ]; then
   echo "$LDAP_TLS_CACERT" >/opt/ca.crt
@@ -171,12 +176,6 @@ EoHTTPrd
 EoHTTPSC
 
 fi
-
-########################
-#If <env_var>_FILE is set, read and export env_var from the referenced file's contents
-
-env_file_replace
-
 
 ########################
 #Set up cron for LDAP storage cleanup (only if enabled)

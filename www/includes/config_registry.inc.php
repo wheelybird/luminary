@@ -1445,14 +1445,7 @@ function is_user_editable($attribute) {
 $SMTP['host'] = getenv('SMTP_HOSTNAME');
 $SMTP['port'] = (is_numeric(getenv('SMTP_HOST_PORT')) ? getenv('SMTP_HOST_PORT') : get_config_default('SMTP_HOST_PORT'));
 $SMTP['user'] = getenv('SMTP_USERNAME');
-
-// Handle password from env or file
-$password_file_path = getenv('SMTP_PASSWORD_FILE');
-if ($password_file_path && file_exists($password_file_path)) {
-  $SMTP['pass'] = trim(file_get_contents($password_file_path));
-} else {
-  $SMTP['pass'] = getenv('SMTP_PASSWORD');
-}
+$SMTP['pass'] = getenv('SMTP_PASSWORD');
 
 $SMTP['tls'] = ((strcasecmp(getenv('SMTP_USE_TLS'),'TRUE') == 0) ? TRUE : get_config_default('SMTP_USE_TLS'));
 $SMTP['ssl'] = ((strcasecmp(getenv('SMTP_USE_SSL'),'TRUE') == 0) ? TRUE : get_config_default('SMTP_USE_SSL'));
