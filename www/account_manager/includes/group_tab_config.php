@@ -49,7 +49,7 @@ function get_group_tabs_config($context, $new_group = false, $group_exists = tru
       'icon' => 'bi-gear',
       'tab_file' => 'tabs/group_attributes_tab.php',
       'handler_file' => 'handlers/group_attributes_handler.php',
-      'enabled' => (count($attribute_map) > 0),
+      'enabled' => (count($attribute_map) > 0 && !$new_group),
       'active' => false
     ]
   ];

@@ -52,7 +52,8 @@ if (!defined('LDAP_USER_MANAGER')) {
       <input type="hidden" name="update_members">
       <input type="hidden" name="group_name" value="<?php print urlencode($group_cn); ?>">
       <?php if ($new_group == TRUE) { ?><input type="hidden" name="initialise_group"><?php } ?>
-      <button id="submit_members" class="btn btn-info" <?php if (count($group_members)==0) print 'disabled'; ?> type="submit" onclick="update_form_with_users()">Save</button>
+      <button id="submit_members" class="btn btn-info" <?php if (count($group_members)==0) print 'disabled'; ?> type="submit" onclick="update_form_with_users()"><?php echo $new_group ? 'Create group' : 'Save'; ?></button>
+    </form>
   </div>
 
   <div class="dual-list list-right col-md-5">
