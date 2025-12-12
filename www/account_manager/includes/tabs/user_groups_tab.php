@@ -52,8 +52,8 @@ if (!defined('LDAP_USER_MANAGER')) {
     <form id="update_with_groups" action="<?php print $CURRENT_PAGE ?>" method="post">
       <input type="hidden" name="update_member_of">
       <input type="hidden" name="account_identifier" value="<?php print $account_identifier; ?>">
+      <button id="submit_members" class="btn btn-info" disabled type="submit" onclick="update_form_with_groups()">Save</button>
     </form>
-    <button id="submit_members" class="btn btn-info" disabled type="submit" onclick="update_form_with_groups()">Save</button>
   </div>
 
   <div class="dual-list list-right col-md-5">

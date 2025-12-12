@@ -75,6 +75,7 @@ elseif (isset($_POST['initialise_group'])) {
   $initialise_group = TRUE;
   $full_dn = "{$LDAP['group_attribute']}=$group_cn,{$LDAP['group_dn']}";
   $has_been = "created";
+  // Group will be created by handler, then we'll fetch it after handlers run
 }
 else {
   $this_group = ldap_get_group_entry($ldap_connection,$group_cn);
@@ -162,7 +163,13 @@ foreach ($all_accounts as $this_person => $attrs) {
 $non_members = array_diff($all_people,$current_members);
 $group_members = $current_members;
 
-// Get tab configuration
+// DEBUG: Check state values BEFORE handlers
+error_log("DEBUG show_group.php [BEFORE handlers]: new_group=" . ($new_group ? 'TRUE' : 'FALSE') .
+          ", group_exists=" . ($group_exists ? 'TRUE' : 'FALSE') .
+          ", initialise_group=" . ($initialise_group ? 'TRUE' : 'FALSE') .
+          ", MFA_FEATURE_ENABLED=" . ($MFA_FEATURE_ENABLED ? 'TRUE' : 'FALSE'));
+
+// Get initial tab configuration (needed to know which handlers to include)
 $group_tabs = get_group_tabs_config('show_group', $new_group, $group_exists, $attribute_map);
 
 // Include all tab handlers directly (in main scope for variable access)
@@ -179,6 +186,27 @@ foreach ($group_tabs as $tab) {
 // - includes/handlers/group_members_handler.php
 // - includes/handlers/group_mfa_handler.php
 // They are included above via the tab configuration loop
+
+// After handlers run, re-fetch group data if it was just created
+if ($initialise_group) {
+  $this_group = ldap_get_group_entry($ldap_connection, $group_cn);
+  if ($this_group) {
+    $current_members = ldap_get_group_members($ldap_connection, $group_cn);
+    $group_exists = TRUE;
+    $new_group = FALSE;
+  }
+}
+
+// DEBUG: Check state values AFTER handlers
+error_log("DEBUG show_group.php [AFTER handlers]: new_group=" . ($new_group ? 'TRUE' : 'FALSE') .
+          ", group_exists=" . ($group_exists ? 'TRUE' : 'FALSE') .
+          ", initialise_group=" . ($initialise_group ? 'TRUE' : 'FALSE'));
+
+// Re-configure tabs with updated state (group now exists after creation)
+$group_tabs = get_group_tabs_config('show_group', $new_group, $group_exists, $attribute_map);
+
+// DEBUG: Show which tabs are enabled
+error_log("DEBUG show_group.php: Enabled tabs: " . implode(', ', array_keys($group_tabs)));
 
 ldap_close($ldap_connection);
 
