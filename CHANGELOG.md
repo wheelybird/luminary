@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.1] - 2025-12-12
+
+### Fixed
+
+- **[#246](https://github.com/wheelybird/luminary/issues/246)** - Nested OU support: LDAP functions now search for user DNs instead of constructing them
+- Environment variable `_FILE` suffix handling for Docker secrets now processed early in entrypoint
+- Group creation UX: button text, attributes tab visibility during creation, MFA tab appearing after creation
+- Form structure bugs causing multiple handlers to trigger on single form submission
+
 ## [2.1.0] - 2025-12-05
 
 ### Added
