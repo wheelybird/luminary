@@ -14,7 +14,7 @@ RUN apt-get update && \
         cron && \
     rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-configure gd --with-freetype && \
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) gd && \
     libdir=$(find /usr -name "libldap.so*" -type f | head -1 | xargs dirname | sed 's|/usr/||') && \
     docker-php-ext-configure ldap --with-libdir=$libdir && \
