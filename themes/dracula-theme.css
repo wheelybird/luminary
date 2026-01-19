@@ -1,0 +1,78 @@
+/* LUMINARY DRACULA THEME 
+  Colors: Background #282a36 | Selection #44475a | Foreground #f8f8f2 | Comment #6272a4
+  Accents: Cyan #8be9fd | Green #50fa7b | Orange #ffb86c | Pink #ff79c6 | Purple #bd93f9 | Yellow #f1fa8c
+*/
+
+/* --- Global & Navbar --- */
+body, html { background-color: #282a36 !important; color: #f8f8f2 !important; }
+.navbar { background-color: #191a21 !important; border-bottom: 2px solid #bd93f9 !important; }
+.navbar-brand, .nav-link { color: #f8f8f2 !important; }
+.navbar-nav .nav-link.active { background-color: #44475a !important; color: #50fa7b !important; border-radius: 4px; }
+
+/* --- Tables (The Zebra Fix) --- */
+.table { 
+    --bs-table-bg: #282a36 !important; 
+    --bs-table-striped-bg: #343746 !important; 
+    --bs-table-hover-bg: #44475a !important; 
+    --bs-table-color: #f8f8f2 !important; 
+    --bs-table-border-color: #6272a4 !important; 
+}
+/* Force white text on all rows to prevent black text on striped rows */
+.table tbody tr td, .table tbody tr th { color: #f8f8f2 !important; }
+.table thead th { background-color: #191a21 !important; color: #bd93f9 !important; border-bottom: 2px solid #6272a4 !important; }
+.table td a { color: #8be9fd !important; font-weight: bold; text-decoration: none; }
+
+/* --- Cards & Home Screen --- */
+.card { background-color: #282a36 !important; border: 1px solid #6272a4 !important; margin-bottom: 1rem; }
+.card-header { background-color: #44475a !important; color: #ff79c6 !important; border-bottom: 1px solid #6272a4 !important; }
+/* Fix unreadable descriptive text in cards */
+.card-body p, .text-muted, .small, label.text-muted, .form-text, .help-block, .select-all-wrapper label { 
+    color: #8be9fd !important; 
+    opacity: 1 !important; 
+}
+.well { background-color: #191a21 !important; border: 1px solid #6272a4 !important; border-radius: 4px; padding: 15px; }
+.dual-list strong { color: #ff79c6 !important; display: inline-block; margin-bottom: 10px; text-transform: uppercase; }
+
+/* --- Forms & Inputs --- */
+label { color: #ffb86c !important; }
+.form-control { background-color: #191a21 !important; border: 1px solid #6272a4 !important; color: #f8f8f2 !important; }
+.form-control::placeholder { color: #6272a4 !important; opacity: 1 !important; }
+.input-group-text { background-color: #44475a !important; border-color: #6272a4 !important; color: #f8f8f2 !important; }
+
+/* --- Buttons --- */
+.btn-primary, .btn-purple { background-color: #bd93f9 !important; border-color: #bd93f9 !important; color: #282a36 !important; }
+.btn-danger { background-color: #ff5555 !important; color: #f8f8f2 !important; }
+.btn-success { background-color: #50fa7b !important; color: #282a36 !important; }
+.btn-info { background-color: #8be9fd !important; border-color: #8be9fd !important; color: #282a36 !important; }
+
+/* --- LDAP Label Overrides --- */
+/* Hide technical keys */
+label[for*="givenName" i], label[for*="givenname" i], label[for*="sn" i], label[for*="mail" i], 
+label[for*="displayName" i], label[for*="telephoneNumber" i], label[for*="mobile" i], 
+label[for*="jpegPhoto" i], label[for*="title" i], label[for="uid"], label[for="cn"] { font-size: 0 !important; }
+
+/* Restore key icon */
+label[for="uid"] i { font-size: 1rem !important; margin-right: 5px; color: #ffb86c !important; display: inline-block !important; }
+
+/* Human-friendly names */
+label[for*="givenName" i]::after, label[for*="givenname" i]::after { content: "First Name"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="sn" i]::after { content: "Last Name"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="mail" i]::after { content: "Email"; font-size: 1rem; color: #ffb86c !important; }
+label[for="uid"]::after { content: "System username (dn)"; font-size: 1rem; color: #ffb86c !important; font-weight: bold; }
+label[for="cn"]::after { content: "Full Name (cn)"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="displayName" i]::after { content: "Display Name"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="telephoneNumber" i]::after { content: "Phone Number"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="mobile" i]::after { content: "Mobile Number"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="jpegPhoto" i]::after { content: "Profile Picture"; font-size: 1rem; color: #ffb86c !important; }
+label[for*="title" i]::after { content: "Job Title / Role"; font-size: 1rem; color: #ffb86c !important; }
+
+/* --- Selection & Highlights --- */
+.nav-tabs .nav-link { color: #6272a4 !important; }
+.nav-tabs .nav-link.active { color: #50fa7b !important; background-color: #44475a !important; border-color: #6272a4 #6272a4 #282a36 !important; }
+
+/* Row Highlight when checked */
+.table tr:has(input:checked), .table tr.selected, .table tr.table-active { background-color: #44475a !important; border-left: 5px solid #50fa7b !important; }
+.table tr:has(input:checked) td { color: #f1fa8c !important; background-color: transparent !important; }
+.list-group-item { background-color: #191a21 !important; color: #f8f8f2 !important; border: 1px solid #44475a !important; }
+.list-group-item.active, .list-group-item:has(input:checked) { background-color: #bd93f9 !important; color: #282a36 !important; border-color: #bd93f9 !important; }
+.table tbody tr:hover, .list-group-item:hover { background-color: #44475a !important; cursor: pointer; }
