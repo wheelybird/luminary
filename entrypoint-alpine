@@ -1,0 +1,223 @@
+#!/bin/bash
+set -e
+
+vartmp=/var/tmp
+
+ssl_dir="${vartmp:-/opt}/ssl"
+php_dir="/opt/ldap_user_manager"
+
+apache_lum_conf_file="${vartmp:-/etc/apache2/conf.d}/lum.conf"
+apache_ports_conf_file="${vartmp:-/etc/apache2/conf.d}/ports.conf"
+ldap_ca_file="${vartmp:-/opt}/ca.crt"
+
+env_file_replace() {
+  for env_file in $(env|grep _FILE=); do
+    read -a env <<< "$(echo "$env_file" | sed 's/\(.*\)_FILE=\(.*\)/\1 \2/')"
+    if [ -s "${env[1]}" ]; then
+      echo Setting "${env[0]}" from "${env[1]}"
+      export "${env[0]}"="$(cat "${env[1]}")"
+      else echo "${env[1]} does not exist or is empty. Leaving ${env[0]} unset"
+    fi
+  done
+}
+
+if [ ! -v SERVER_HOSTNAME ]; then
+  export SERVER_HOSTNAME="ldapusermanager.org";
+fi
+if [ ! -v SERVER_PATH ]; then
+  export SERVER_PATH="/";
+  apache_alias=""
+else
+  apache_alias="Alias $SERVER_PATH $php_dir"
+fi
+
+if [ -f "${LDAP_TLS_CACERT_FILENAME}" ]; then
+#If LDAP_TLS_CACERT_FILENAME exists then set up the LDAP client conf to use it.
+  echo "TLS_CACERT ${LDAP_TLS_CACERT_FILENAME}" >"${vartmp:-/etc/openldap}/ldap.conf"
+elif [ -v LDAP_TLS_CACERT ]; then
+#If LDAP_TLS_CACERT is set then write it out as a file
+#and set up the LDAP client conf to use it.
+  echo "$LDAP_TLS_CACERT" >"${ldap_ca_file}"
+  echo "TLS_CACERT ${ldap_ca_file}" >"${vartmp:-/etc/openldap}/ldap.conf"
+fi
+
+if [ "${NO_HTTPS,,}" == "true" ]; then
+
+  cat <<EoHTTPC >"${apache_lum_conf_file}"
+
+<VirtualHost *:${SERVER_PORT:-80}>
+
+ ServerName $SERVER_HOSTNAME
+ DocumentRoot $php_dir
+ $apache_alias
+ DirectoryIndex index.php index.html
+
+ <Directory $php_dir>
+   Require all granted
+ </Directory>
+
+</VirtualHost>
+EoHTTPC
+
+  echo "Listen ${SERVER_PORT:-80}" > "${apache_ports_conf_file}"
+
+else
+
+  ########################
+  #If there aren't any SSL certs then create a CA and then CA-signed certificate
+
+  if [ ! -f "${ssl_dir}/${SERVER_CERT_FILENAME:-server.crt}" ] && [ ! -f "${ssl_dir}/${SERVER_KEY_FILENAME:-server.key}" ]; then
+
+    echo "Generating certificate stuff..."
+    mkdir -p "$ssl_dir"
+    confout="${ssl_dir}/conf"
+    keyout="${ssl_dir}/server.key"
+    certout="${ssl_dir}/server.crt"
+    cakey="${ssl_dir}/.ca.key"
+    cacert="${ssl_dir}/.ca.crt"
+    serialfile="${ssl_dir}/.serial"
+
+    echo "Generating CA key"
+    if ! openssl genrsa -out "$cakey" 2048; then exit 1 ; fi
+
+    echo "Generating CA certificate"
+    if ! openssl req \
+            -x509 \
+            -new \
+            -nodes \
+            -subj "/C=GB/ST=GB/L=GB/O=CA/OU=CA/CN=Wheelybird" \
+            -key "$cakey" \
+            -sha256 \
+            -days 7300 \
+            -out "$cacert"; then exit 1 ; fi
+
+    echo "Generating openssl configuration"
+
+    cat <<EoCertConf >"$confout"
+subjectAltName = DNS:${SERVER_HOSTNAME},IP:127.0.0.1
+extendedKeyUsage = serverAuth
+EoCertConf
+
+    echo "Generating server key..."
+
+    if ! openssl genrsa -out "$keyout" 2048; then exit 1 ; fi
+
+    echo "Generating server signing request..."
+
+    if ! openssl req \
+                 -subj "/CN=${SERVER_HOSTNAME}" \
+                 -sha256 \
+                 -new \
+                 -key "$keyout" \
+                 -out "$vartmp/server.csr"; then exit 1 ; fi
+
+    echo "Generating server cert..."
+
+    if ! openssl x509 \
+                  -req \
+                  -days 7300 \
+                  -sha256 \
+                  -in "$vartmp/server.csr" \
+                  -CA "$cacert" \
+                  -CAkey "$cakey" \
+                  -CAcreateserial \
+                  -CAserial "$serialfile" \
+                  -out "$certout" \
+                  -extfile "$confout"; then exit 1 ; fi
+
+  fi
+
+
+  ########################
+  #Create Apache config
+
+  if [ -f "${ssl_dir}/${CA_CERT_FILENAME}" ]; then ssl_chain="SSLCertificateChainFile ${ssl_dir}/${CA_CERT_FILENAME}"; fi
+
+  echo  > "${apache_lum_conf_file}"
+  echo  > "${apache_ports_conf_file}"
+
+  if [ ! "$SERVER_PORT" ]; then
+
+    echo "Listen 80" > "${apache_ports_conf_file}"
+
+    cat <<EoHTTPrd >"${apache_lum_conf_file}"
+
+<VirtualHost *:80>
+
+ RewriteEngine On
+ RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R,L]
+
+</VirtualHost>
+
+EoHTTPrd
+
+  fi
+
+  echo "Listen ${SERVER_PORT:-443}" >> "${apache_ports_conf_file}"
+
+  cat <<EoHTTPSC >>"${apache_lum_conf_file}"
+
+LoadModule ssl_module modules/mod_ssl.so
+LoadModule socache_shmcb_module modules/mod_socache_shmcb.so
+SSLRandomSeed startup file:/dev/urandom 512
+SSLRandomSeed connect builtin
+
+SSLCipherSuite HIGH:MEDIUM:!MD5:!RC4:!3DES:!ADH
+SSLProxyCipherSuite HIGH:MEDIUM:!MD5:!RC4:!3DES:!ADH
+
+SSLHonorCipherOrder on
+
+SSLProtocol all -SSLv3
+SSLProxyProtocol all -SSLv3
+
+SSLPassPhraseDialog  builtin
+
+SSLSessionCache        "shmcb:/var/cache/mod_ssl/scache(512000)"
+SSLSessionCacheTimeout  300
+
+<VirtualHost _default_:${SERVER_PORT:-443}>
+
+ ServerName $SERVER_HOSTNAME
+
+ DocumentRoot $php_dir
+ ErrorLog logs/ssl_error.log
+ TransferLog logs/ssl_access.log
+
+ $apache_alias
+ DirectoryIndex index.php index.html
+
+ <Directory $php_dir>
+   Require all granted
+ </Directory>
+
+ SSLEngine On
+ SSLCertificateFile ${ssl_dir}/${SERVER_CERT_FILENAME:-server.crt}
+ SSLCertificateKeyFile ${ssl_dir}/${SERVER_KEY_FILENAME:-server.key}
+ $ssl_chain
+
+ BrowserMatch "MSIE [2-5]" \
+         nokeepalive ssl-unclean-shutdown \
+         downgrade-1.0 force-response-1.0
+# CustomLog logs/ssl_request.log \
+#          "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
+
+</VirtualHost>
+EoHTTPSC
+
+fi
+
+
+########################
+#If <env_var>_FILE is set, read and export env_var from the referenced file's contents
+env_file_replace
+
+########################
+
+#Run Apache
+
+# first arg is `-f` or `--some-option`
+if [ "${1#-}" != "$1" ]; then
+        set -- httpd "$@"
+fi
+
+exec "$@"
