@@ -23,7 +23,7 @@ if ($EMAIL_SENDING_ENABLED != TRUE) {
 
 $request_sent = FALSE;
 $rate_limited = FALSE;
-$username_input = '';
+$username_input = isset($_GET['username']) ? trim($_GET['username']) : '';
 
 if (isset($_POST['request_reset'])) {
 
