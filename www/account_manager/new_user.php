@@ -109,6 +109,7 @@ foreach ($attribute_map as $attribute => $attr_r) {
 ##
 
 $uid_prefilled = FALSE;
+$send_email_checked = FALSE;
 
 if (isset($_GET['account_request'])) {
 
@@ -123,6 +124,10 @@ if (isset($_GET['account_request'])) {
     $new_account_r['uid'] = $uid;
     unset($new_account_r['uid']['count']);
     $uid_prefilled = TRUE;
+  }
+
+  if (isset($_GET['send_email']) and $_GET['send_email'] == "1") {
+    $send_email_checked = TRUE;
   }
 
   $mail[0]=filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
@@ -442,6 +447,9 @@ $tabindex=1;
 
 
 </script>
+<?php if (isset($_GET['generate_password']) and $_GET['generate_password'] == "1") { ?>
+<script>document.addEventListener('DOMContentLoaded', random_password);</script>
+<?php } ?>
 <script>
 
  function check_email_validity(mail) {
@@ -510,7 +518,7 @@ $tabindex=1;
       <div class="row mb-3" id="send_email_div">
        <label for="send_email" class="col-sm-3 col-form-label"> </label>
        <div class="col-sm-6">
-        <input tabindex="<?php print $tabindex+4; ?>" type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" <?php if ($disabled_email_tickbox == TRUE) { print "disabled"; } ?>>  Email these credentials to the user?
+        <input tabindex="<?php print $tabindex+4; ?>" type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" <?php if ($disabled_email_tickbox == TRUE) { print "disabled"; } ?><?php if ($send_email_checked == TRUE) { print " checked"; } ?>>  Email these credentials to the user?
        </div>
       </div>
 <?php } ?>
