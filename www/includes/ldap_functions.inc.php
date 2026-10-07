@@ -2,6 +2,17 @@
 
 ###################################
 
+#A Unix domain socket never leaves the host, so StartTLS is neither available
+#nor meaningful on one - the socket's filesystem permissions are the security
+#boundary instead.
+function ldap_uri_is_local_socket($uri) {
+
+ return (bool)preg_match('/^ldapi:\/\//i', trim($uri));
+
+}
+
+###################################
+
 function open_ldap_connection($ldap_bind=TRUE) {
 
  global $log_prefix, $LDAP, $SENT_HEADERS, $LDAP_DEBUG, $LDAP_VERBOSE_CONNECTION_LOGS;
@@ -18,7 +29,15 @@ function open_ldap_connection($ldap_bind=TRUE) {
  ldap_set_option($ldap_connection, LDAP_OPT_PROTOCOL_VERSION, 3);
  if ($LDAP_VERBOSE_CONNECTION_LOGS == TRUE) { ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7); }
 
- if (!preg_match("/^ldaps:/", $LDAP['uri'])) {
+ if (ldap_uri_is_local_socket($LDAP['uri'])) {
+
+  if ($LDAP_DEBUG == TRUE) {
+   error_log("$log_prefix Using a local socket connection to {$LDAP['uri']}",0);
+  }
+  $LDAP['connection_type'] = 'LDAPI';
+
+ }
+ elseif (!preg_match("/^ldaps:/", $LDAP['uri'])) {
 
   $tls_result = @ ldap_start_tls($ldap_connection);
 

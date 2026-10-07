@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **[#275](https://github.com/wheelybird/luminary/issues/275)** - `ldapi://` connections are no longer treated as insecure. A Unix domain socket never leaves the host, but the connection code only exempted `ldaps://` from StartTLS, so an `ldapi://` URI was sent down the plain-LDAP path: StartTLS was attempted and failed, an error was logged, the "Insecure LDAP connection" banner appeared, and the connection was recorded as `plain`. That last part also blocked self-service password changes via the ppolicy overlay, which refuses to send a cleartext password over a connection it doesn't consider protected, and `LDAP_REQUIRE_STARTTLS=TRUE` made it fatal outright. A local socket is now recognised as its own connection type (`LDAPI`) and accepted as protected, since the socket's filesystem permissions are the security boundary. The setup checks and the System configuration page report it as a local socket rather than claiming it is encrypted.
+
 ## [2.2.1]
 
 ### Security

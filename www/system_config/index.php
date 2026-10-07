@@ -340,6 +340,10 @@ function display_config_item($key, $metadata) {
       $tls_status = 'StartTLS';
       $tls_status_class = 'bg-success';
       $tls_icon = 'bi-shield-lock';
+    } elseif ($LDAP['connection_type'] == 'LDAPI') {
+      $tls_status = 'Local socket (ldapi)';
+      $tls_status_class = 'bg-success';
+      $tls_icon = 'bi-shield-lock';
     }
   }
 
