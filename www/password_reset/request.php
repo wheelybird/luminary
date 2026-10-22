@@ -24,6 +24,9 @@ if ($EMAIL_SENDING_ENABLED != TRUE) {
 $request_sent = FALSE;
 $rate_limited = FALSE;
 $username_input = isset($_GET['username']) ? trim($_GET['username']) : '';
+if (!preg_match('/^[a-zA-Z0-9._-]+$/', $username_input)) {
+  $username_input = '';
+}
 
 if (isset($_POST['request_reset'])) {
 
