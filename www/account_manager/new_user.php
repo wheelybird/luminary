@@ -130,19 +130,6 @@ if (isset($_GET['account_request'])) {
     $send_email_checked = TRUE;
   }
 
-  $mail[0]=filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
-  if ($mail[0] == "") {
-    if (isset($EMAIL_DOMAIN)) {
-      $mail[0] = $uid[0] . "@" . $EMAIL_DOMAIN;
-      $disabled_email_tickbox = FALSE;
-    }
-  }
-  else {
-    $disabled_email_tickbox = FALSE;
-  }
-  $new_account_r['mail'] = $mail;
-  unset($new_account_r['mail']['count']);
-
 }
 
 
@@ -168,6 +155,25 @@ if (isset($_GET['account_request']) or isset($_POST['create_account'])) {
     $new_account_r['cn'] = $cn;
     unset($new_account_r['cn']['count']);
   }
+
+}
+
+
+#Runs after username generation so the EMAIL_DOMAIN fallback has a uid to use
+if (isset($_GET['account_request'])) {
+
+  $mail[0]=filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
+  if ($mail[0] == "") {
+    if (isset($EMAIL_DOMAIN)) {
+      $mail[0] = $uid[0] . "@" . $EMAIL_DOMAIN;
+      $disabled_email_tickbox = FALSE;
+    }
+  }
+  else {
+    $disabled_email_tickbox = FALSE;
+  }
+  $new_account_r['mail'] = $mail;
+  unset($new_account_r['mail']['count']);
 
 }
 
