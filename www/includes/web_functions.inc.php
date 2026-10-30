@@ -934,7 +934,11 @@ function render_js_username_generator($firstname_field_id,$lastname_field_id,$us
   print <<<EoRenderJS
 
 <script>
+ var auto_username_update = true;
+
  function update_username() {
+
+  if (auto_username_update != true) { return; }
 
   var first_name_elem = document.getElementById('$firstname_field_id');
   var last_name_elem  = document.getElementById('$lastname_field_id');

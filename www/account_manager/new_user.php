@@ -108,6 +108,9 @@ foreach ($attribute_map as $attribute => $attr_r) {
 
 ##
 
+$uid_prefilled = FALSE;
+$send_email_checked = FALSE;
+
 if (isset($_GET['account_request'])) {
 
   $givenname[0]=trim($_GET['first_name']);
@@ -116,10 +119,21 @@ if (isset($_GET['account_request'])) {
   $sn[0]=trim($_GET['last_name']);
   $new_account_r['sn'] = $sn[0];
 
+  if (isset($_GET['uid']) and trim($_GET['uid']) != "") {
+    $uid[0]=trim($_GET['uid']);
+    $new_account_r['uid'] = $uid;
+    unset($new_account_r['uid']['count']);
+    $uid_prefilled = TRUE;
+  }
+
+  if (isset($_GET['send_email']) and $_GET['send_email'] == "1") {
+    $send_email_checked = TRUE;
+  }
+
   $mail[0]=filter_var($_GET['email'], FILTER_SANITIZE_EMAIL);
   if ($mail[0] == "") {
     if (isset($EMAIL_DOMAIN)) {
-      $mail[0] = $uid . "@" . $EMAIL_DOMAIN;
+      $mail[0] = $uid[0] . "@" . $EMAIL_DOMAIN;
       $disabled_email_tickbox = FALSE;
     }
   }
@@ -376,6 +390,9 @@ if ($errors != "") { ?>
 
 render_js_username_check();
 render_js_username_generator('givenname','sn','uid','uid_div');
+if ($uid_prefilled == TRUE) {
+  print "<script>var auto_username_update = false;</script>\n";
+}
 render_js_cn_generator('givenname','sn','cn','cn_div');
 render_js_email_generator('uid','mail');
 render_js_homedir_generator('uid','homedirectory');
@@ -430,6 +447,9 @@ $tabindex=1;
 
 
 </script>
+<?php if (isset($_GET['generate_password']) and $_GET['generate_password'] == "1") { ?>
+<script>document.addEventListener('DOMContentLoaded', random_password);</script>
+<?php } ?>
 <script>
 
  function check_email_validity(mail) {
@@ -498,7 +518,7 @@ $tabindex=1;
       <div class="row mb-3" id="send_email_div">
        <label for="send_email" class="col-sm-3 col-form-label"> </label>
        <div class="col-sm-6">
-        <input tabindex="<?php print $tabindex+4; ?>" type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" <?php if ($disabled_email_tickbox == TRUE) { print "disabled"; } ?>>  Email these credentials to the user?
+        <input tabindex="<?php print $tabindex+4; ?>" type="checkbox" class="form-check-input" id="send_email_checkbox" name="send_email" <?php if ($disabled_email_tickbox == TRUE) { print "disabled"; } ?><?php if ($send_email_checked == TRUE) { print " checked"; } ?>>  Email these credentials to the user?
        </div>
       </div>
 <?php } ?>
