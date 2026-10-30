@@ -474,8 +474,8 @@ function password_policy_self_service_change($username, $old_password, $new_pass
   // Check the actual connection type (set by open_ldap_connection)
   $connection_type = isset($LDAP['connection_type']) ? $LDAP['connection_type'] : 'plain';
 
-  if ($connection_type != 'StartTLS' && $connection_type != 'LDAPS') {
-    error_log("$log_prefix ppolicy password change requires STARTTLS or LDAPS - cleartext password would be sent insecurely. Current connection type: " . $connection_type);
+  if ($connection_type != 'StartTLS' && $connection_type != 'LDAPS' && $connection_type != 'LDAPI') {
+    error_log("$log_prefix ppolicy password change requires STARTTLS, LDAPS or a local socket - cleartext password would be sent insecurely. Current connection type: " . $connection_type);
     $error = "SYSTEM_ERROR";
     ldap_close($admin_ldap);
     return false;
@@ -521,9 +521,9 @@ function password_policy_self_service_change($username, $old_password, $new_pass
   ldap_set_option($user_ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
   ldap_set_option($user_ldap, LDAP_OPT_REFERRALS, 0);
 
-  // Start TLS if using ldap:// (not ldaps://)
+  // Start TLS if using ldap:// (not ldaps://, and not a local socket)
   // This matches the logic in open_ldap_connection()
-  if (!preg_match("/^ldaps:/", $ldap_uri)) {
+  if (!preg_match("/^ldaps:/", $ldap_uri) && !ldap_uri_is_local_socket($ldap_uri)) {
     if (!@ldap_start_tls($user_ldap)) {
       error_log("$log_prefix ppolicy password change: failed to start TLS on user connection");
       $error = "SYSTEM_ERROR";
