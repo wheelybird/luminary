@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Lint PHP
         run: docker run --rm -v "$PWD:/app" -w /app php:8.4-cli sh -c 'find www docs -name "*.php" -print0 | xargs -0 -n1 php -l > /dev/null'
