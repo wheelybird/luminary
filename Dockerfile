@@ -1,4 +1,5 @@
-FROM php:8.4-apache
+# Pinned for CVE-2026-109618 / CVE-2026-109619 (fixed in PHP 8.4.27). Bump on the next PHP security release.
+FROM php:8.4.27-apache
 
 LABEL org.opencontainers.image.authors="wheelybird@wheelybird.com"
 LABEL org.opencontainers.image.title="Luminary"
