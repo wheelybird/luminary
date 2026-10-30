@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Opens a PR when a new php:8.4.x-apache base image is published
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: daily
+    ignore:
+      - dependency-name: php
+        update-types: [version-update:semver-major, version-update:semver-minor]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

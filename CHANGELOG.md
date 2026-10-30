@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **[#279](https://github.com/wheelybird/luminary/issues/279)** - The Docker image is now built on PHP 8.4.27, which fixes two unauthenticated remote code execution vulnerabilities in the PHP engine (CVE-2026-109618 and CVE-2026-109619). The base image is pinned to `php:8.4.27-apache` instead of the floating `php:8.4-apache` tag, so it is explicit which PHP release an image carries. Thanks to **xgaia** for the fix ([#280](https://github.com/wheelybird/luminary/pull/280)) and **finnmargraf** for the report.
+
+### Added
+
+- **[#277](https://github.com/wheelybird/luminary/pull/277)** - The account-request link to the create-user form accepts more prefill parameters: `uid` sets the username (and stops it being regenerated when the name fields are edited), `send_email=1` pre-ticks "Email these credentials to the user", and `generate_password=1` generates a password on page load. The password reset request page also accepts `username`, which is validated the same way as a submitted username. Thanks to **xgaia** (Libreon).
+
+### Fixed
+
+- Create-user form: when an account-request link has no `email` and `EMAIL_DOMAIN` is set, the generated address now uses the generated username. Previously the fallback ran before the username was generated, giving an address with nothing before the `@`.
+- **[#275](https://github.com/wheelybird/luminary/issues/275)** - `ldapi://` connections are no longer treated as insecure. A Unix domain socket never leaves the host, but the connection code only exempted `ldaps://` from StartTLS, so an `ldapi://` URI was sent down the plain-LDAP path: StartTLS was attempted and failed, an error was logged, the "Insecure LDAP connection" banner appeared, and the connection was recorded as `plain`. That last part also blocked self-service password changes via the ppolicy overlay, which refuses to send a cleartext password over a connection it doesn't consider protected, and `LDAP_REQUIRE_STARTTLS=TRUE` made it fatal outright. A local socket is now recognised as its own connection type (`LDAPI`) and accepted as protected, since the socket's filesystem permissions are the security boundary. The setup checks and the System configuration page report it as a local socket rather than claiming it is encrypted.
+
 ## [2.2.1]
 
 ### Security
