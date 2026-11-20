@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- The Docker image is now built on PHP 8.4.28 (`php:8.4.28-apache`), from the PHP security release of 19 November 2026, which fixes 17 vulnerabilities, seven of them rated critical. Several are in session handling (including CVE-2026-115560, CVE-2026-126714 and CVE-2026-129481), which Luminary relies on for login and MFA verification. The PHP-FPM request smuggling flaw (CVE-2026-129289) does not affect the image, which runs PHP under Apache's `mod_php`.
+
+### Changed
+
+- Dependabot no longer proposes PHP release candidate (`RC`) base images.
+
 ## [2.2.2] - 2026-10-30
 
 ### Security

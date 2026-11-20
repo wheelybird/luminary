@@ -8,6 +8,9 @@ updates:
     ignore:
       - dependency-name: php
         update-types: [version-update:semver-major, version-update:semver-minor]
+      # PHP tags pre-releases as e.g. 8.4.28RC1, which Dependabot doesn't recognise as pre-release
+      - dependency-name: php
+        versions: ["*RC*"]
 
   - package-ecosystem: github-actions
     directory: /
