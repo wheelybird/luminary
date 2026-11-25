@@ -19,6 +19,16 @@
  * - display_code: Whether to display in <code> tags
  */
 
+// Load configuration from file if CONFIG_FILE is set
+$config_file = getenv('CONFIG_FILE');
+if ($config_file && file_exists($config_file)) {
+    $config = parse_ini_file($config_file);
+    foreach ($config as $key => $value) {
+        putenv("$key=$value");
+        $_ENV[$key] = $value;
+    }
+}
+
 # Category definitions - groups related configurations together
 $CONFIG_CATEGORIES = array(
   'ldap' => array(
