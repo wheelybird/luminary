@@ -20,7 +20,7 @@ jobs:
           grep -q '[^[:space:]]' release-notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
 
       - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v3
         with:
