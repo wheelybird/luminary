@@ -35,8 +35,10 @@ docker run -e MFA_FEATURE_ENABLED=TRUE luminary
 # Group "admins" has mfaRequired=TRUE in LDAP → requires TOTP to log into Luminary
 
 # VPN - uses service configuration
-docker run -e MFA_REQUIRED_GROUPS=vpn-users openvpn-server-ldap-otp
-# Only users in "vpn-users" need MFA for VPN access
+docker run -e MFA_ENABLED=true -e MFA_BACKEND=ldap \
+  -e "LDAP_FILTER=(memberOf=cn=vpn-users,ou=groups,dc=example,dc=com)" openvpn-server-ldap-otp
+# Only "vpn-users" can connect, and every one of them needs MFA
+# (pending users can connect without a code until their grace period ends)
 
 # SSH - configured separately (maybe no MFA required)
 # PAM stack without TOTP module → password-only authentication
@@ -187,11 +189,15 @@ Specify groups via environment variables. This is simpler but less flexible:
 
 ### Step 1: User Notification
 
-When a user is added to an MFA-required group:
+When a user is created in, or added to, an MFA-required group, or a group they're already in is marked as MFA-required:
 
-1. Their account is automatically marked with `totpStatus=pending`
+1. Their account is automatically marked with `totpStatus=pending` and `totpEnrolledDate` is set to the current time
 2. The grace period countdown begins
 3. They see warnings on the home page prompting them to set up MFA
+
+Users who are already enrolled (`active`) or exempt (`bypassed`) are left alone, and so are pending users whose grace period has already started, so adding them to another group doesn't restart the countdown. This applies to both `mfaRequired` on the group and `MFA_REQUIRED_GROUPS`.
+
+The pending status is also what gives users a grace period on the VPN, as [openvpn-server-ldap-otp](https://github.com/wheelybird/openvpn-server-ldap-otp) only lets users without a TOTP secret connect while they're pending and within their grace period.
 
 ### Step 2: QR Code Setup
 
@@ -218,6 +224,12 @@ After successful enrolment:
 2. Codes are displayed once and must be saved
 3. Backup codes are stored in LDAP for emergency access
 4. Each code can only be used once
+
+### Changing or disabling MFA
+
+Once MFA is active, the "Manage MFA" page asks for a current code before it will set up a new authenticator or disable MFA. Users who have lost their authenticator can enter one of their backup codes instead, which then can't be used again.
+
+After five wrong codes, the user has to wait 15 minutes before trying again. Wrong codes, and backup codes used here, are recorded in the audit log.
 
 ## Grace Periods
 
@@ -260,7 +272,7 @@ When using LDAP-based MFA enforcement, each group can have its own grace period:
 
 **Example:** The "admins" group could have a 3-day grace period while "developers" have 14 days.
 
-**Priority:** If a user is in multiple MFA-required groups with different grace periods, the **longest** grace period applies.
+**Priority:** If a user is in multiple MFA-required groups with different grace periods, the **shortest** grace period applies.
 
 ## Admin Management
 
@@ -324,7 +336,7 @@ Luminary works alongside [openvpn-server-ldap-otp](https://github.com/wheelybird
 2. **MFA Enrolment**: Users enrol via the web interface
 3. **LDAP Storage**: TOTP secrets stored in LDAP
 4. **VPN Authentication**: OpenVPN server validates password+TOTP
-5. **Unified Policy**: Same MFA requirements across web and VPN
+5. **Grace periods**: Users that Luminary marks as pending can connect to the VPN without a code until their grace period ends
 
 ### VPN Connection
 
@@ -522,10 +534,9 @@ Luminary enforces MFA at login based on group membership. Users in MFA-required 
 
 **Services With Configurable Enforcement:**
 
-- **pam-ldap-totp-auth** (PAM module for SSH, VPN, etc.): Planned feature
-  - Current behaviour: All-or-nothing (if PAM module is configured, ALL users need MFA)
-  - **Planned**: New `group_based_enforcement` option to check LDAP group membership
-  - See PAM module documentation for updates
+- **pam-ldap-totp-auth** (PAM module for SSH, VPN, etc.): All-or-nothing
+  - If the PAM module is configured, ALL users who can authenticate need MFA, apart from pending users within their grace period
+  - Restrict who can authenticate with `ldap_filter` (`LDAP_FILTER` in openvpn-server-ldap-otp)
 
 **Service-Level vs. Group-Level:**
 

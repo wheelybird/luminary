@@ -246,43 +246,6 @@ if (isset($_POST['create_account'])) {
     }
     audit_log('user_created', $account_identifier, $user_details, 'success', $USER_ID);
 
-    // Check if MFA is enabled and if user will be in an MFA-required group
-    if ($MFA_FEATURE_ENABLED == TRUE && !empty($MFA_REQUIRED_GROUPS)) {
-      // Get the groups this user will be added to
-      $user_groups = array();
-      if (isset($DEFAULT_USER_GROUP)) {
-        $user_groups[] = $DEFAULT_USER_GROUP;
-      }
-
-      // Check if any of the user's groups require MFA
-      $requires_mfa = false;
-      foreach ($user_groups as $group) {
-        if (in_array($group, $MFA_REQUIRED_GROUPS)) {
-          $requires_mfa = true;
-          break;
-        }
-      }
-
-      // If MFA is required and schema is available, set status to pending
-      if ($requires_mfa && $MFA_SCHEMA_OK) {
-        $user_dn = "{$LDAP['account_attribute']}={$account_identifier},{$LDAP['user_dn']}";
-
-        // Add TOTP objectClass if not present
-        $oc_mod = array('objectClass' => $TOTP_ATTRS['objectclass']);
-        @ldap_mod_add($ldap_connection, $user_dn, $oc_mod);
-
-        // Set initial MFA status to pending with enrolled date
-        $mfa_attributes = array(
-          $TOTP_ATTRS['status'] => 'pending',
-          $TOTP_ATTRS['enrolled_date'] => gmdate('YmdHis') . 'Z'
-        );
-        ldap_mod_replace($ldap_connection, $user_dn, $mfa_attributes);
-      }
-      elseif ($requires_mfa && !$MFA_SCHEMA_OK) {
-        error_log("Cannot set MFA pending status for new user {$account_identifier}: TOTP schema not available");
-      }
-    }
-
     $creation_message = "The account was created.";
 
     if (isset($send_user_email) and $send_user_email == TRUE) {

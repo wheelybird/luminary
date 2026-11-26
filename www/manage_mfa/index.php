@@ -62,6 +62,27 @@ if ($MFA_FEATURE_ENABLED && !$MFA_SCHEMA_OK) {
   $schema_error = true;
 }
 
+$has_active_mfa = ($totp_status == 'active');
+
+// Disabling or replacing an active setup needs a current code (#291)
+function mfa_check_current_code($ldap_connection, $user_dn, $action) {
+  global $USER_ID;
+
+  $result = totp_verify_current_code($ldap_connection, $user_dn, $USER_ID, isset($_POST['current_code']) ? $_POST['current_code'] : '');
+  if ($result === 'rate_limited') {
+    audit_log("mfa_{$action}_failure", $USER_ID, 'Too many incorrect current codes', 'failure', $USER_ID);
+    return "Too many incorrect codes. Please wait 15 minutes and try again.";
+  }
+  if ($result === false) {
+    audit_log("mfa_{$action}_failure", $USER_ID, 'Incorrect current code', 'failure', $USER_ID);
+    return "That code wasn't accepted. Enter the current code from your authenticator app, or one of your backup codes.";
+  }
+  if ($result === 'backup') {
+    audit_log('mfa_backup_code_used', $USER_ID, "Backup code used to authorise MFA {$action}", 'success', $USER_ID);
+  }
+  return null;
+}
+
 // Handle first code validation (AJAX)
 if (isset($_POST['validate_first_code'])) {
   header('Content-Type: application/json');
@@ -91,8 +112,12 @@ if (isset($_POST['enrol_mfa'])) {
     $time_window1 = $_POST['time_window1'];
     $time_window2 = floor(time() / 30);
 
+    if ($has_active_mfa && !totp_reenrol_is_authorised($USER_ID, $secret)) {
+      audit_log('mfa_reenrol_failure', $USER_ID, 'Re-enrolment attempted without verifying the current code', 'failure', $USER_ID);
+      $error_message = "Your re-enrolment has expired. Please start again.";
+    }
     // Verify codes are from different time windows
-    if ($time_window1 == $time_window2) {
+    elseif ($time_window1 == $time_window2) {
       $error_message = "Second code must be from a different time window. Please wait for the code to change.";
     }
     // Validate second code
@@ -105,8 +130,8 @@ if (isset($_POST['enrol_mfa'])) {
 
       // Save to LDAP
       if (totp_set_secret($ldap_connection, $user_dn, $secret, $backup_codes)) {
-        // Audit log successful MFA enrolment
-        audit_log('mfa_enrolled', $USER_ID, 'User enrolled in MFA', 'success', $USER_ID);
+        totp_reenrol_clear($USER_ID);
+        audit_log('mfa_enrolled', $USER_ID, $has_active_mfa ? 'User re-enrolled in MFA' : 'User enrolled in MFA', 'success', $USER_ID);
         $success = true;
         $totp_status = 'active';
       }
@@ -122,6 +147,9 @@ if (isset($_POST['disable_mfa'])) {
   if ($schema_error) {
     $error_message = "Multi-factor authentication is currently unavailable due to a configuration issue. Please contact your administrator.";
   }
+  elseif ($has_active_mfa && ($code_error = mfa_check_current_code($ldap_connection, $user_dn, 'disable')) !== null) {
+    $error_message = $code_error;
+  }
   elseif (totp_disable($ldap_connection, $user_dn)) {
     // Audit log MFA disabled
     audit_log('mfa_disabled', $USER_ID, 'User disabled MFA', 'success', $USER_ID);
@@ -134,11 +162,22 @@ if (isset($_POST['disable_mfa'])) {
 }
 
 // Handle new enrolment request
-if (isset($_POST['start_enrolment'])) {
-  $enrolling = true;
-  $new_secret = totp_generate_secret();
-  $qr_url = totp_get_qr_code_url($new_secret, $USER_ID, $MFA_TOTP_ISSUER);
-  $qr_image_url = totp_get_qr_code_image_url($qr_url);
+if (isset($_POST['start_enrolment']) && !$schema_error) {
+  $code_error = $has_active_mfa ? mfa_check_current_code($ldap_connection, $user_dn, 'reenrol') : null;
+  if ($code_error !== null) {
+    $error_message = $code_error;
+  }
+  else {
+    $new_secret = totp_generate_secret();
+    if ($has_active_mfa && !totp_reenrol_authorise($USER_ID, $new_secret)) {
+      $error_message = "Couldn't start re-enrolment. Please try again.";
+    }
+    else {
+      $enrolling = true;
+      $qr_url = totp_get_qr_code_url($new_secret, $USER_ID, $MFA_TOTP_ISSUER);
+      $qr_image_url = totp_get_qr_code_image_url($qr_url);
+    }
+  }
 }
 
 render_header("Manage Multi-Factor Authentication");
@@ -269,7 +308,7 @@ render_header("Manage Multi-Factor Authentication");
           <?php } ?>
         </table>
 
-        <?php if ($totp_status == 'active') { ?>
+        <?php if ($totp_status == 'active' && !isset($enrolling)) { ?>
           <div class="alert alert-info">
             <strong>MFA is currently enabled for your account.</strong>
             <p>When connecting services that require MFA you'll need to use your authenticator app to generate a One-Time Password (OTP).</p>
@@ -277,7 +316,20 @@ render_header("Manage Multi-Factor Authentication");
           </div>
 
           <form method="POST">
+            <p>To set up a new authenticator or disable MFA, first enter the current code from your authenticator app. If you've lost access to it, you can use one of your backup codes instead.</p>
+            <div class="row justify-content-center mb-3">
+              <div class="col-auto">
+                <label for="current_code" class="col-form-label">Current code:</label>
+              </div>
+              <div class="col-auto">
+                <input type="text" class="form-control text-center" id="current_code" name="current_code"
+                       inputmode="numeric" pattern="[0-9 ]{6,9}" maxlength="9" autocomplete="one-time-code" required>
+              </div>
+            </div>
             <div class="text-center">
+              <button type="submit" name="start_enrolment" class="btn btn-primary" <?php if ($schema_error) echo 'disabled title="MFA schema not available"'; ?>>
+                Set up a new authenticator
+              </button>
               <button type="submit" name="disable_mfa" class="btn btn-danger" <?php if ($schema_error) echo 'disabled title="MFA schema not available"'; ?> onclick="return confirm('Are you sure you want to disable MFA? This will make your account less secure.');">
                 Disable MFA
               </button>

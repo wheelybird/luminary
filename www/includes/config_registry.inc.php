@@ -1264,6 +1264,16 @@ function env_is_true($env_var_name) {
   return filter_var($value, FILTER_VALIDATE_BOOLEAN);
 }
 
+/**
+ * Boolean setting from the environment, falling back to the registry default
+ * only when the variable is unset, so an explicit FALSE overrides a TRUE default.
+ */
+function env_bool($env_var_name) {
+  $value = getenv($env_var_name);
+  if ($value === false || trim($value) === '') { return (bool) get_config_default($env_var_name); }
+  return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+}
+
 $log_prefix = "";
 
 ##############################################################################
@@ -1276,14 +1286,14 @@ $LDAP['admin_bind_dn'] = getenv('LDAP_ADMIN_BIND_DN');
 $LDAP['admin_bind_pwd'] = getenv('LDAP_ADMIN_BIND_PWD');
 $LDAP['connection_type'] = "plain";
 
-$LDAP['require_starttls'] = (env_is_true('LDAP_REQUIRE_STARTTLS') ? TRUE : get_config_default('LDAP_REQUIRE_STARTTLS'));
-$LDAP['ignore_cert_errors'] = (env_is_true('LDAP_IGNORE_CERT_ERRORS') ? TRUE : get_config_default('LDAP_IGNORE_CERT_ERRORS'));
+$LDAP['require_starttls'] = env_bool('LDAP_REQUIRE_STARTTLS');
+$LDAP['ignore_cert_errors'] = env_bool('LDAP_IGNORE_CERT_ERRORS');
 $LDAP['rfc2307bis_check_run'] = FALSE;
 
 $LDAP['admins_group'] = (getenv('LDAP_ADMINS_GROUP') ? getenv('LDAP_ADMINS_GROUP') : get_config_default('LDAP_ADMINS_GROUP'));
 $LDAP['group_ou'] = (getenv('LDAP_GROUP_OU') ? getenv('LDAP_GROUP_OU') : get_config_default('LDAP_GROUP_OU'));
 $LDAP['user_ou'] = (getenv('LDAP_USER_OU') ? getenv('LDAP_USER_OU') : get_config_default('LDAP_USER_OU'));
-$LDAP['forced_rfc2307bis'] = (env_is_true('FORCE_RFC2307BIS') ? TRUE : get_config_default('FORCE_RFC2307BIS'));
+$LDAP['forced_rfc2307bis'] = env_bool('FORCE_RFC2307BIS');
 
 $LDAP['account_attribute'] = (getenv('LDAP_ACCOUNT_ATTRIBUTE') ? getenv('LDAP_ACCOUNT_ATTRIBUTE') : get_config_default('LDAP_ACCOUNT_ATTRIBUTE'));
 $LDAP['group_attribute'] = (getenv('LDAP_GROUP_ATTRIBUTE') ? getenv('LDAP_GROUP_ATTRIBUTE') : get_config_default('LDAP_GROUP_ATTRIBUTE'));
@@ -1359,7 +1369,7 @@ if (getenv('LDAP_GROUP_MEMBERSHIP_USES_UID')) {
 
 $DEFAULT_USER_GROUP = (getenv('DEFAULT_USER_GROUP') ? getenv('DEFAULT_USER_GROUP') : get_config_default('DEFAULT_USER_GROUP'));
 $DEFAULT_USER_SHELL = (getenv('DEFAULT_USER_SHELL') ? getenv('DEFAULT_USER_SHELL') : get_config_default('DEFAULT_USER_SHELL'));
-$USER_PRIVATE_GROUPS = (env_is_true('USER_PRIVATE_GROUPS') ? TRUE : get_config_default('USER_PRIVATE_GROUPS'));
+$USER_PRIVATE_GROUPS = env_bool('USER_PRIVATE_GROUPS');
 
 // ENFORCE_USERNAME_VALIDATION with backward compatibility for ENFORCE_SAFE_SYSTEM_NAMES
 if (getenv('ENFORCE_USERNAME_VALIDATION') !== false) {
@@ -1375,9 +1385,9 @@ $USERNAME_FORMAT = (getenv('USERNAME_FORMAT') ? getenv('USERNAME_FORMAT') : get_
 $USERNAME_REGEX = (getenv('USERNAME_REGEX') ? getenv('USERNAME_REGEX') : get_config_default('USERNAME_REGEX'));
 
 if (getenv('PASSWORD_HASH')) { $PASSWORD_HASH = strtoupper(getenv('PASSWORD_HASH')); }
-$ACCEPT_WEAK_PASSWORDS = (env_is_true('ACCEPT_WEAK_PASSWORDS') ? TRUE : get_config_default('ACCEPT_WEAK_PASSWORDS'));
+$ACCEPT_WEAK_PASSWORDS = env_bool('ACCEPT_WEAK_PASSWORDS');
 
-$SHOW_POSIX_ATTRIBUTES = (env_is_true('SHOW_POSIX_ATTRIBUTES') ? TRUE : get_config_default('SHOW_POSIX_ATTRIBUTES'));
+$SHOW_POSIX_ATTRIBUTES = env_bool('SHOW_POSIX_ATTRIBUTES');
 
 $min_uid = 2000;
 $min_gid = 2000;
@@ -1399,7 +1409,7 @@ if ($SHOW_POSIX_ATTRIBUTES != TRUE) {
 # Multi-Factor Authentication
 ##############################################################################
 
-$MFA_FEATURE_ENABLED = (env_is_true('MFA_FEATURE_ENABLED') ? TRUE : get_config_default('MFA_FEATURE_ENABLED'));
+$MFA_FEATURE_ENABLED = env_bool('MFA_FEATURE_ENABLED');
 
 // Parse MFA_REQUIRED_GROUPS into array
 $MFA_REQUIRED_GROUPS = array();
@@ -1443,8 +1453,8 @@ $GROUP_MFA_ATTRS = array(
 # Password Reset Settings
 ##############################################################################
 
-$PASSWORD_RESET_ENABLED = (env_is_true('PASSWORD_RESET_ENABLED') ? TRUE : get_config_default('PASSWORD_RESET_ENABLED'));
-$USE_LDAP_AS_DB = (env_is_true('USE_LDAP_AS_DB') ? TRUE : get_config_default('USE_LDAP_AS_DB'));
+$PASSWORD_RESET_ENABLED = env_bool('PASSWORD_RESET_ENABLED');
+$USE_LDAP_AS_DB = env_bool('USE_LDAP_AS_DB');
 
 $PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = (is_numeric(getenv('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES')) ? (int)getenv('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES') : get_config_default('PASSWORD_RESET_TOKEN_EXPIRY_MINUTES'));
 $PASSWORD_RESET_RATE_LIMIT_REQUESTS = (is_numeric(getenv('PASSWORD_RESET_RATE_LIMIT_REQUESTS')) ? (int)getenv('PASSWORD_RESET_RATE_LIMIT_REQUESTS') : get_config_default('PASSWORD_RESET_RATE_LIMIT_REQUESTS'));
@@ -1482,7 +1492,7 @@ if (getenv('USER_EDITABLE_ATTRIBUTES')) {
 }
 
 // Empties the editable list (an empty USER_EDITABLE_ATTRIBUTES would fall back to defaults) (#269).
-$USER_EDITABLE_ATTRIBUTES_DISABLED = (env_is_true('USER_EDITABLE_ATTRIBUTES_DISABLED') ? TRUE : get_config_default('USER_EDITABLE_ATTRIBUTES_DISABLED'));
+$USER_EDITABLE_ATTRIBUTES_DISABLED = env_bool('USER_EDITABLE_ATTRIBUTES_DISABLED');
 if ($USER_EDITABLE_ATTRIBUTES_DISABLED) {
   $USER_EDITABLE_ATTRIBUTES = array();
 }
@@ -1512,8 +1522,8 @@ $SMTP['port'] = (is_numeric(getenv('SMTP_HOST_PORT')) ? getenv('SMTP_HOST_PORT')
 $SMTP['user'] = getenv('SMTP_USERNAME');
 $SMTP['pass'] = getenv('SMTP_PASSWORD');
 
-$SMTP['tls'] = (env_is_true('SMTP_USE_TLS') ? TRUE : get_config_default('SMTP_USE_TLS'));
-$SMTP['ssl'] = (env_is_true('SMTP_USE_SSL') ? TRUE : get_config_default('SMTP_USE_SSL'));
+$SMTP['tls'] = env_bool('SMTP_USE_TLS');
+$SMTP['ssl'] = env_bool('SMTP_USE_SSL');
 $SMTP['helo'] = getenv('SMTP_HELO_HOST');
 
 $EMAIL['from_address'] = (getenv('EMAIL_FROM_ADDRESS') ? getenv('EMAIL_FROM_ADDRESS') : get_config_default('EMAIL_FROM_ADDRESS'));
@@ -1523,11 +1533,11 @@ $EMAIL_DOMAIN = getenv('EMAIL_DOMAIN');
 
 $EMAIL_SENDING_ENABLED = (!empty($SMTP['host']));
 
-$EMAIL_USER_ON_PASSWORD_CHANGE = (env_is_true('EMAIL_USER_ON_PASSWORD_CHANGE') ? TRUE : get_config_default('EMAIL_USER_ON_PASSWORD_CHANGE'));
-$EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE = (env_is_true('EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE') ? TRUE : get_config_default('EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE'));
+$EMAIL_USER_ON_PASSWORD_CHANGE = env_bool('EMAIL_USER_ON_PASSWORD_CHANGE');
+$EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE = env_bool('EMAIL_ADMIN_ON_USER_PASSWORD_CHANGE');
 $ADMIN_EMAIL = (getenv('ADMIN_EMAIL') ? getenv('ADMIN_EMAIL') : get_config_default('ADMIN_EMAIL'));
 
-$ACCOUNT_REQUESTS_ENABLED = (env_is_true('ACCOUNT_REQUESTS_ENABLED') ? TRUE : get_config_default('ACCOUNT_REQUESTS_ENABLED'));
+$ACCOUNT_REQUESTS_ENABLED = env_bool('ACCOUNT_REQUESTS_ENABLED');
 // Account requests email with fallback to ADMIN_EMAIL
 $ACCOUNT_REQUESTS_EMAIL = getenv('ACCOUNT_REQUESTS_EMAIL');
 if (!$ACCOUNT_REQUESTS_EMAIL) {
@@ -1545,7 +1555,7 @@ $ORGANISATION_NAME = (getenv('ORGANISATION_NAME') ? getenv('ORGANISATION_NAME') 
 $SITE_NAME = (getenv('SITE_NAME') ? getenv('SITE_NAME') : $ORGANISATION_NAME);
 
 $SERVER_HOSTNAME = (getenv('SERVER_HOSTNAME') ? getenv('SERVER_HOSTNAME') : get_config_default('SERVER_HOSTNAME'));
-$NO_HTTPS = (env_is_true('NO_HTTPS') ? TRUE : get_config_default('NO_HTTPS'));
+$NO_HTTPS = env_bool('NO_HTTPS');
 $SERVER_PATH = (getenv('SERVER_PATH') ? getenv('SERVER_PATH') : get_config_default('SERVER_PATH'));
 
 $SITE_LOGIN_LDAP_ATTRIBUTE = (getenv('SITE_LOGIN_LDAP_ATTRIBUTE') ? getenv('SITE_LOGIN_LDAP_ATTRIBUTE') : $LDAP['account_attribute']);
@@ -1567,16 +1577,16 @@ if (getenv('SHOW_POWERED_BY') !== false) {
 ##############################################################################
 
 $SESSION_TIMEOUT = (is_numeric(getenv('SESSION_TIMEOUT')) ? (int)getenv('SESSION_TIMEOUT') : get_config_default('SESSION_TIMEOUT'));
-$REMOTE_HTTP_HEADERS_LOGIN = (env_is_true('REMOTE_HTTP_HEADERS_LOGIN') ? TRUE : get_config_default('REMOTE_HTTP_HEADERS_LOGIN'));
+$REMOTE_HTTP_HEADERS_LOGIN = env_bool('REMOTE_HTTP_HEADERS_LOGIN');
 
 ##############################################################################
 # Debug & Logging
 ##############################################################################
 
-$LDAP_DEBUG = (env_is_true('LDAP_DEBUG') ? TRUE : get_config_default('LDAP_DEBUG'));
-$LDAP_VERBOSE_CONNECTION_LOGS = (env_is_true('LDAP_VERBOSE_CONNECTION_LOGS') ? TRUE : get_config_default('LDAP_VERBOSE_CONNECTION_LOGS'));
-$SESSION_DEBUG = (env_is_true('SESSION_DEBUG') ? TRUE : get_config_default('SESSION_DEBUG'));
-$SHOW_ERROR_DETAILS = (env_is_true('SHOW_ERROR_DETAILS') ? TRUE : get_config_default('SHOW_ERROR_DETAILS'));
+$LDAP_DEBUG = env_bool('LDAP_DEBUG');
+$LDAP_VERBOSE_CONNECTION_LOGS = env_bool('LDAP_VERBOSE_CONNECTION_LOGS');
+$SESSION_DEBUG = env_bool('SESSION_DEBUG');
+$SHOW_ERROR_DETAILS = env_bool('SHOW_ERROR_DETAILS');
 
 $SMTP['debug_level'] = getenv('SMTP_LOG_LEVEL');
 if (!is_numeric($SMTP['debug_level']) or $SMTP['debug_level'] > 4 or $SMTP['debug_level'] < 0) {
@@ -1587,7 +1597,7 @@ if (!is_numeric($SMTP['debug_level']) or $SMTP['debug_level'] > 4 or $SMTP['debu
 # Audit Logging
 ##############################################################################
 
-$AUDIT_ENABLED = (env_is_true('AUDIT_ENABLED') ? TRUE : get_config_default('AUDIT_ENABLED'));
+$AUDIT_ENABLED = env_bool('AUDIT_ENABLED');
 $AUDIT_LOG_FILE = (getenv('AUDIT_LOG_FILE') ? getenv('AUDIT_LOG_FILE') : get_config_default('AUDIT_LOG_FILE'));
 $AUDIT_LOG_RETENTION_DAYS = (is_numeric(getenv('AUDIT_LOG_RETENTION_DAYS')) ? (int)getenv('AUDIT_LOG_RETENTION_DAYS') : get_config_default('AUDIT_LOG_RETENTION_DAYS'));
 
@@ -1595,13 +1605,13 @@ $AUDIT_LOG_RETENTION_DAYS = (is_numeric(getenv('AUDIT_LOG_RETENTION_DAYS')) ? (i
 # Password Policy
 ##############################################################################
 
-$PASSWORD_POLICY_ENABLED = (env_is_true('PASSWORD_POLICY_ENABLED') ? TRUE : get_config_default('PASSWORD_POLICY_ENABLED'));
-$PPOLICY_ENABLED = (env_is_true('PPOLICY_ENABLED') ? TRUE : get_config_default('PPOLICY_ENABLED'));
+$PASSWORD_POLICY_ENABLED = env_bool('PASSWORD_POLICY_ENABLED');
+$PPOLICY_ENABLED = env_bool('PPOLICY_ENABLED');
 $PASSWORD_MIN_LENGTH = (is_numeric(getenv('PASSWORD_MIN_LENGTH')) ? (int)getenv('PASSWORD_MIN_LENGTH') : get_config_default('PASSWORD_MIN_LENGTH'));
-$PASSWORD_REQUIRE_UPPERCASE = (env_is_true('PASSWORD_REQUIRE_UPPERCASE') ? TRUE : get_config_default('PASSWORD_REQUIRE_UPPERCASE'));
-$PASSWORD_REQUIRE_LOWERCASE = (env_is_true('PASSWORD_REQUIRE_LOWERCASE') ? TRUE : get_config_default('PASSWORD_REQUIRE_LOWERCASE'));
-$PASSWORD_REQUIRE_NUMBERS = (env_is_true('PASSWORD_REQUIRE_NUMBERS') ? TRUE : get_config_default('PASSWORD_REQUIRE_NUMBERS'));
-$PASSWORD_REQUIRE_SPECIAL = (env_is_true('PASSWORD_REQUIRE_SPECIAL') ? TRUE : get_config_default('PASSWORD_REQUIRE_SPECIAL'));
+$PASSWORD_REQUIRE_UPPERCASE = env_bool('PASSWORD_REQUIRE_UPPERCASE');
+$PASSWORD_REQUIRE_LOWERCASE = env_bool('PASSWORD_REQUIRE_LOWERCASE');
+$PASSWORD_REQUIRE_NUMBERS = env_bool('PASSWORD_REQUIRE_NUMBERS');
+$PASSWORD_REQUIRE_SPECIAL = env_bool('PASSWORD_REQUIRE_SPECIAL');
 $PASSWORD_MIN_SCORE = (is_numeric(getenv('PASSWORD_MIN_SCORE')) ? (int)getenv('PASSWORD_MIN_SCORE') : get_config_default('PASSWORD_MIN_SCORE'));
 $PASSWORD_HISTORY_COUNT = (is_numeric(getenv('PASSWORD_HISTORY_COUNT')) ? (int)getenv('PASSWORD_HISTORY_COUNT') : get_config_default('PASSWORD_HISTORY_COUNT'));
 $PASSWORD_EXPIRY_DAYS = (is_numeric(getenv('PASSWORD_EXPIRY_DAYS')) ? (int)getenv('PASSWORD_EXPIRY_DAYS') : get_config_default('PASSWORD_EXPIRY_DAYS'));
@@ -1611,11 +1621,11 @@ $PASSWORD_EXPIRY_WARNING_DAYS = (is_numeric(getenv('PASSWORD_EXPIRY_WARNING_DAYS
 # Account Lifecycle
 ##############################################################################
 
-$LIFECYCLE_ENABLED = (env_is_true('LIFECYCLE_ENABLED') ? TRUE : get_config_default('LIFECYCLE_ENABLED'));
-$ACCOUNT_EXPIRY_ENABLED = (env_is_true('ACCOUNT_EXPIRY_ENABLED') ? TRUE : get_config_default('ACCOUNT_EXPIRY_ENABLED'));
+$LIFECYCLE_ENABLED = env_bool('LIFECYCLE_ENABLED');
+$ACCOUNT_EXPIRY_ENABLED = env_bool('ACCOUNT_EXPIRY_ENABLED');
 $ACCOUNT_INACTIVE_DAYS = (is_numeric(getenv('ACCOUNT_INACTIVE_DAYS')) ? (int)getenv('ACCOUNT_INACTIVE_DAYS') : get_config_default('ACCOUNT_INACTIVE_DAYS'));
 $ACCOUNT_EXPIRY_WARNING_DAYS = (is_numeric(getenv('ACCOUNT_EXPIRY_WARNING_DAYS')) ? (int)getenv('ACCOUNT_EXPIRY_WARNING_DAYS') : get_config_default('ACCOUNT_EXPIRY_WARNING_DAYS'));
-$ACCOUNT_CLEANUP_ENABLED = (env_is_true('ACCOUNT_CLEANUP_ENABLED') ? TRUE : get_config_default('ACCOUNT_CLEANUP_ENABLED'));
+$ACCOUNT_CLEANUP_ENABLED = env_bool('ACCOUNT_CLEANUP_ENABLED');
 
 ##############################################################################
 # HELPER FUNCTIONS

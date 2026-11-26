@@ -584,6 +584,181 @@ function totp_user_requires_mfa($ldap_connection, $username, $mfa_required_group
 }
 
 /**
+ * Check a code from the user's current authenticator, or one of their backup codes,
+ * before a change to their MFA. Rate limited per user; TOTP codes can't be replayed
+ * and a backup code is removed once used.
+ *
+ * @return string|false 'totp', 'backup', 'rate_limited', or false if the code is wrong
+ */
+function totp_verify_current_code($ldap_connection, $user_dn, $user_id, $code) {
+  global $TOTP_ATTRS;
+  include_once "rate_limit_functions.inc.php";
+
+  $rate_key = 'mfa_change_' . $user_id;
+  if (!rate_limit_check($rate_key, 5, 15)) {
+    return 'rate_limited';
+  }
+
+  $code = preg_replace('/\s+/', '', (string) $code);
+  $secret_attr = $TOTP_ATTRS['secret'];
+  $scratch_attr = $TOTP_ATTRS['scratch_codes'];
+  $search = @ldap_read($ldap_connection, $user_dn, '(objectClass=*)', array($secret_attr, $scratch_attr));
+  $entry = $search ? ldap_get_entries($ldap_connection, $search) : array('count' => 0);
+
+  $result = false;
+  if ($entry['count'] > 0) {
+    $secret = isset($entry[0][strtolower($secret_attr)][0]) ? $entry[0][strtolower($secret_attr)][0] : null;
+
+    if ($secret && preg_match('/^\d{6}$/', $code) && totp_validate_code($secret, $code, 1, 30)
+        && !totp_code_recently_used($user_id, $code, 1, 30)) {
+      totp_mark_code_used($user_id, $code, 1, 30);
+      $result = 'totp';
+    }
+    elseif (preg_match('/^\d{8}$/', $code) && isset($entry[0][strtolower($scratch_attr)])) {
+      $stored = $entry[0][strtolower($scratch_attr)];
+      for ($i = 0; $i < $stored['count']; $i++) {
+        if (hash_equals((string) $stored[$i], $code)) {
+          if (@ldap_mod_del($ldap_connection, $user_dn, array($scratch_attr => $stored[$i]))) {
+            $result = 'backup';
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  if ($result === false) {
+    rate_limit_increment($rate_key, 15);
+  }
+  return $result;
+}
+
+/**
+ * Re-enrolment over an active MFA setup is a two-step form, so after the current code
+ * is checked the new secret is recorded server side and enrolment only accepts that one.
+ */
+function totp_reenrol_file($user_id) {
+  return "/tmp/mfa_reenrol_" . hash('sha256', $user_id);
+}
+
+function totp_reenrol_authorise($user_id, $secret) {
+  $data = json_encode(array('secret' => hash('sha256', $secret), 'expires' => time() + 600));
+  return file_put_contents(totp_reenrol_file($user_id), $data, LOCK_EX) !== false;
+}
+
+function totp_reenrol_is_authorised($user_id, $secret) {
+  $file = totp_reenrol_file($user_id);
+  if (!file_exists($file)) {
+    return false;
+  }
+  $data = json_decode(file_get_contents($file), true);
+  if (!is_array($data) || !isset($data['secret'], $data['expires']) || $data['expires'] < time()) {
+    @unlink($file);
+    return false;
+  }
+  return hash_equals($data['secret'], hash('sha256', (string) $secret));
+}
+
+function totp_reenrol_clear($user_id) {
+  @unlink(totp_reenrol_file($user_id));
+}
+
+/**
+ * Whether the TOTP schema is usable, checking it on first use if no page has yet.
+ */
+function totp_schema_available($ldap_connection) {
+  global $MFA_FEATURE_ENABLED, $MFA_SCHEMA_OK;
+
+  if ($MFA_FEATURE_ENABLED != TRUE) {
+    return false;
+  }
+  if ($MFA_SCHEMA_OK === NULL) {
+    $MFA_SCHEMA_OK = totp_check_schema($ldap_connection);
+  }
+  return $MFA_SCHEMA_OK == TRUE;
+}
+
+/**
+ * Whether a group requires MFA, via its mfaRequired attribute or MFA_REQUIRED_GROUPS.
+ */
+function totp_group_requires_mfa($ldap_connection, $group_name) {
+  global $LDAP, $GROUP_MFA_ATTRS, $MFA_REQUIRED_GROUPS;
+
+  if (!empty($MFA_REQUIRED_GROUPS) && in_array($group_name, $MFA_REQUIRED_GROUPS)) {
+    return true;
+  }
+
+  $required_attr = $GROUP_MFA_ATTRS['required'];
+  $filter = "({$LDAP['group_attribute']}=" . ldap_escape($group_name, "", LDAP_ESCAPE_FILTER) . ")";
+  $search = @ldap_search($ldap_connection, $LDAP['group_dn'], $filter, array($required_attr));
+  if (!$search) {
+    return false;
+  }
+  $entry = ldap_get_entries($ldap_connection, $search);
+  $attr_lower = strtolower($required_attr);
+
+  return isset($entry[0][$attr_lower][0]) && strcasecmp($entry[0][$attr_lower][0], 'TRUE') == 0;
+}
+
+/**
+ * Start the MFA grace period for a user who now requires MFA but has none set up:
+ * sets status to pending with the current date. Active and bypassed users, and
+ * pending users whose grace period has already started, are left alone.
+ *
+ * @return bool True if the user was set to pending
+ */
+function totp_start_grace_period($ldap_connection, $username) {
+  global $LDAP, $TOTP_ATTRS, $log_prefix;
+
+  if (!totp_schema_available($ldap_connection)) {
+    return false;
+  }
+
+  $status_attr = $TOTP_ATTRS['status'];
+  $enrolled_attr = $TOTP_ATTRS['enrolled_date'];
+  $filter = "({$LDAP['account_attribute']}=" . ldap_escape($username, "", LDAP_ESCAPE_FILTER) . ")";
+  $search = @ldap_search($ldap_connection, $LDAP['user_dn'], $filter, array('objectClass', $status_attr, $enrolled_attr));
+  if (!$search) {
+    return false;
+  }
+  $entry = ldap_get_entries($ldap_connection, $search);
+  if ($entry['count'] != 1) {
+    return false;
+  }
+
+  $user_dn = $entry[0]['dn'];
+  $status = isset($entry[0][strtolower($status_attr)][0]) ? $entry[0][strtolower($status_attr)][0] : 'none';
+  $enrolled = isset($entry[0][strtolower($enrolled_attr)][0]) ? $entry[0][strtolower($enrolled_attr)][0] : '';
+
+  if ($status == 'active' || $status == 'bypassed' || ($status == 'pending' && $enrolled != '')) {
+    return false;
+  }
+
+  $object_classes = array();
+  for ($i = 0; $i < $entry[0]['objectclass']['count']; $i++) {
+    $object_classes[] = strtolower($entry[0]['objectclass'][$i]);
+  }
+  if (!in_array(strtolower($TOTP_ATTRS['objectclass']), $object_classes)) {
+    if (!@ldap_mod_add($ldap_connection, $user_dn, array('objectClass' => $TOTP_ATTRS['objectclass']))) {
+      error_log("$log_prefix MFA: couldn't add {$TOTP_ATTRS['objectclass']} to $username: " . ldap_error($ldap_connection), 0);
+      return false;
+    }
+  }
+
+  $modifications = array(
+    $status_attr => 'pending',
+    $enrolled_attr => gmdate('YmdHis') . 'Z',
+  );
+  if (!@ldap_mod_replace($ldap_connection, $user_dn, $modifications)) {
+    error_log("$log_prefix MFA: couldn't start grace period for $username: " . ldap_error($ldap_connection), 0);
+    return false;
+  }
+
+  error_log("$log_prefix MFA: started grace period for $username (was $status)", 0);
+  return true;
+}
+
+/**
  * Calculate days remaining in grace period
  *
  * @param string $enrolled_date LDAP timestamp (YmdHisZ format)

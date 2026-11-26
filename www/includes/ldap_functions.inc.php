@@ -1145,26 +1145,12 @@ function ldap_new_account($ldap_connection,$account_r) {
          }
        }
 
-       // Initialise MFA if enabled and user is in required group
+       // Covers a primary group set by gidNumber, which isn't added through ldap_add_member_to_group()
        if ($MFA_FEATURE_ENABLED) {
          include_once "totp_functions.inc.php";
-         $user_dn = "{$LDAP['account_attribute']}=$account_identifier,{$LDAP['user_dn']}";
-
          $mfa_result = totp_user_requires_mfa($ldap_connection, $account_identifier, $MFA_REQUIRED_GROUPS);
          if ($mfa_result['required']) {
-           // Add totpUser object class and set status to pending
-           $mfa_modifications = array(
-             'objectClass' => array_merge($objectclasses, array('totpUser')),
-             'totpStatus' => 'pending',
-             'totpEnrolledDate' => gmdate('YmdHis') . 'Z',
-           );
-
-           $add_mfa = @ ldap_mod_replace($ldap_connection, $user_dn, $mfa_modifications);
-           if ($add_mfa) {
-             error_log("$log_prefix Create account; Initialised MFA (pending) for $account_identifier",0);
-           } else {
-             error_log("$log_prefix Create account; Failed to initialise MFA for $account_identifier: " . ldap_error($ldap_connection),0);
-           }
+           totp_start_grace_period($ldap_connection, $account_identifier);
          }
        }
 
@@ -1267,7 +1253,9 @@ function ldap_delete_account($ldap_connection,$username) {
 
 function ldap_add_member_to_group($ldap_connection,$group_name,$username) {
 
-  global $log_prefix, $LDAP, $LDAP_DEBUG;
+  global $log_prefix, $LDAP, $LDAP_DEBUG, $MFA_FEATURE_ENABLED;
+
+  $account_identifier = $username;
 
   $rfc2307bis_available = ldap_detect_rfc2307bis($ldap_connection);
 
@@ -1314,6 +1302,12 @@ function ldap_add_member_to_group($ldap_connection,$group_name,$username) {
 
   if ($update) {
    error_log("$log_prefix Added $username to group '$group_name'",0);
+   if ($MFA_FEATURE_ENABLED == TRUE) {
+     include_once "totp_functions.inc.php";
+     if (totp_group_requires_mfa($ldap_connection, $group_name)) {
+       totp_start_grace_period($ldap_connection, $account_identifier);
+     }
+   }
    return TRUE;
   }
   else {

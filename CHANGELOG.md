@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **[#291](https://github.com/wheelybird/luminary/issues/291)** - Disabling MFA, or setting up a new authenticator over an active one, now requires a current code from the user's authenticator or one of their backup codes. Previously anyone with access to a logged-in session could remove or replace the user's second factor. The only safeguard on disabling was a browser confirmation, and the enrolment form would overwrite an active secret. After five wrong codes the user has to wait 15 minutes. A replayed TOTP code is rejected, a backup code is removed once used, and failures are audit-logged. Re-enrolment only accepts the secret that Luminary issued after the code was checked. The page now offers "Set up a new authenticator" alongside "Disable MFA".
+
+### Fixed
+
+- **[#290](https://github.com/wheelybird/luminary/issues/290)** - Members of groups marked MFA-required in the GUI now get their grace period. Previously `totpStatus=pending` was only set when a new user's default group was listed in `MFA_REQUIRED_GROUPS`, so existing and newly added members of groups with `mfaRequired=TRUE` had no status, were forced to enrol at their next login, and got no grace period on the VPN. A user is now set to pending, with the current date, when they're created in or added to an MFA-required group (via `mfaRequired` or `MFA_REQUIRED_GROUPS`), and all members are set to pending when a group is marked MFA-required. Active and bypassed users are left alone, and so are pending users whose grace period has already started.
+- **[#289](https://github.com/wheelybird/luminary/issues/289)** - Boolean settings can now be set to `FALSE` when their default is `TRUE`. An explicit `PASSWORD_REQUIRE_UPPERCASE=false`, `PASSWORD_REQUIRE_LOWERCASE=false` or `PASSWORD_REQUIRE_NUMBERS=false` used to fall back to the default (`TRUE`). All boolean settings now go through one helper, `env_bool()`, which only uses the default when the variable is unset. Thanks to **CyrussM** for the report and diagnosis.
+- MFA docs: when a user is in several MFA-required groups, the shortest grace period applies, not the longest. The OpenVPN example no longer uses `MFA_REQUIRED_GROUPS`, which the OpenVPN image doesn't read.
+
 ## [2.2.3] - 2026-11-20
 
 ### Security

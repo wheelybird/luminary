@@ -66,6 +66,21 @@ if (isset($_POST["submit_mfa"]) && $MFA_FEATURE_ENABLED) {
     audit_log('group_mfa_updated', $group_cn, $mfa_details, 'success', $USER_ID);
 
     $message = "MFA settings for group '$group_cn' have been updated.";
+
+    if ($mfa_required == 'TRUE') {
+      include_once "totp_functions.inc.php";
+      $started = 0;
+      foreach (ldap_get_group_members($ldap_connection, $group_cn) as $member) {
+        if (totp_start_grace_period($ldap_connection, $member)) {
+          $started++;
+        }
+      }
+      if ($started > 0) {
+        audit_log('group_mfa_grace_started', $group_cn, "Grace period started for {$started} member(s)", 'success', $USER_ID);
+        $message .= " The MFA grace period has started for {$started} member" . ($started == 1 ? '' : 's') . " who hadn't set up MFA.";
+      }
+    }
+
     render_alert_banner($message, "success", 5000);
     // Reload group data
     $this_group = ldap_get_group_entry($ldap_connection, $group_cn);
